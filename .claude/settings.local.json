@@ -4,7 +4,9 @@
       "Bash(firebase --version)",
       "Bash(gh auth:*)",
       "Bash(firebase projects:list)",
-      "Bash(vercel whoami:*)"
+      "Bash(vercel whoami:*)",
+      "Bash(git ls-remote:*)",
+      "Bash(vercel env:*)"
     ]
   }
 }
