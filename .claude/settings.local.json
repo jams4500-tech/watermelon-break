@@ -6,7 +6,8 @@
       "Bash(firebase projects:list)",
       "Bash(vercel whoami:*)",
       "Bash(git ls-remote:*)",
-      "Bash(vercel env:*)"
+      "Bash(vercel env:*)",
+      "Bash(firebase deploy:*)"
     ]
   }
 }
