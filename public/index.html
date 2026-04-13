@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, maximum-scale=1, user-scalable=no">
+<title>수박 깨기</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;600;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--text:#1A1A1A;--text-sub:#8E8E93;--green:#2E7D32;--red:#E8334A;--sand:#F5E6C8;--sky1:#87CEEB;--sky2:#B0E0FF;--sea1:#1E88E5;--sea2:#0D47A1;--sea-shallow:#4FC3F7}
+  html,body{width:100%;height:100%;font-family:'Noto Sans KR',-apple-system,sans-serif;background:#F5F5F0;overflow-x:hidden;-webkit-tap-highlight-color:transparent;user-select:none}
+
+  /* HEADER */
+  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;position:sticky;top:0;background:rgba(135,206,235,0.92);backdrop-filter:blur(12px);z-index:100}
+  .header-left{display:flex;align-items:center;gap:8px}
+  .header-back{font-size:20px;color:var(--text)}
+  .header-title{font-weight:700;font-size:17px;color:var(--text);display:flex;align-items:center;gap:6px}
+  .header-icon{width:24px;height:24px;border-radius:6px;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:14px}
+  .header-right{display:flex;align-items:center;gap:12px;color:#555;font-size:20px}
+
+  /* STATS BAR */
+  .stats-bar{display:flex;margin:0;background:rgba(255,255,255,0.75);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.5)}
+  .stat-cell{flex:1;text-align:center;padding:14px 0;position:relative}
+  .stat-cell:first-child::after{content:'';position:absolute;right:0;top:20%;height:60%;width:1px;background:rgba(0,0,0,0.08)}
+  .stat-value{font-family:'Black Han Sans';font-size:26px;color:var(--text)}
+  .stat-value small{font-size:14px;font-weight:400}
+  .stat-label{font-size:12px;color:var(--text-sub);margin-top:2px;display:flex;align-items:center;justify-content:center;gap:4px}
+
+  /* ===== BEACH SCENE ===== */
+  .beach-scene{position:relative;height:420px;overflow:hidden;background:linear-gradient(180deg,#87CEEB 0%,#B0E0FF 45%,#E0F7FA 55%,var(--sand) 65%,#E8D5A8 100%)}
+
+  /* 구름 */
+  .cloud{position:absolute;background:white;border-radius:50px;opacity:0.8}
+  .cloud::before,.cloud::after{content:'';position:absolute;background:white;border-radius:50%}
+  .cloud-1{width:80px;height:28px;top:30px;animation:cloudMove 25s linear infinite}
+  .cloud-1::before{width:40px;height:40px;top:-20px;left:15px}
+  .cloud-1::after{width:30px;height:30px;top:-12px;left:45px}
+  .cloud-2{width:60px;height:22px;top:60px;animation:cloudMove 35s linear infinite;animation-delay:-10s;opacity:0.6}
+  .cloud-2::before{width:30px;height:30px;top:-15px;left:10px}
+  .cloud-2::after{width:22px;height:22px;top:-8px;left:32px}
+  @keyframes cloudMove{0%{left:-120px}100%{left:110%}}
+
+  /* 태양 */
+  .sun{position:absolute;top:25px;right:50px;width:60px;height:60px;background:radial-gradient(circle,#FFF176 30%,#FFD54F 60%,rgba(255,213,79,0) 70%);border-radius:50%;animation:sunGlow 3s ease-in-out infinite alternate}
+  @keyframes sunGlow{0%{box-shadow:0 0 30px rgba(255,213,79,0.4)}100%{box-shadow:0 0 50px rgba(255,213,79,0.6)}}
+
+  /* 바다 */
+  .sea{position:absolute;bottom:140px;left:0;right:0;height:100px}
+  .wave{position:absolute;width:200%;height:40px;left:-50%;animation-timing-function:linear;animation-iteration-count:infinite}
+  .wave-1{bottom:60px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40'%3E%3Cpath d='M0 20 Q150 0 300 20 Q450 40 600 20 Q750 0 900 20 Q1050 40 1200 20 L1200 40 L0 40Z' fill='%234FC3F7' opacity='0.5'/%3E%3C/svg%3E") repeat-x;background-size:600px 40px;animation:waveAnim 4s linear infinite}
+  .wave-2{bottom:50px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40'%3E%3Cpath d='M0 20 Q150 0 300 20 Q450 40 600 20 Q750 0 900 20 Q1050 40 1200 20 L1200 40 L0 40Z' fill='%2329B6F6' opacity='0.6'/%3E%3C/svg%3E") repeat-x;background-size:600px 40px;animation:waveAnim 3.5s linear infinite reverse}
+  .wave-3{bottom:42px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40'%3E%3Cpath d='M0 15 Q150 0 300 15 Q450 30 600 15 Q750 0 900 15 Q1050 30 1200 15 L1200 40 L0 40Z' fill='%230288D1' opacity='0.4'/%3E%3C/svg%3E") repeat-x;background-size:600px 40px;animation:waveAnim 5s linear infinite}
+  @keyframes waveAnim{0%{transform:translateX(0)}100%{transform:translateX(50%)}}
+
+  /* 모래 */
+  .sand-ground{position:absolute;bottom:0;left:0;right:0;height:145px;background:linear-gradient(180deg,var(--sand) 0%,#E0C9A0 100%)}
+  /* 모래 점 텍스처 */
+  .sand-ground::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(0,0,0,0.03) 1px,transparent 1px);background-size:12px 12px}
+
+  /* 돗자리 */
+  .mat{position:absolute;bottom:25px;left:50%;transform:translateX(-50%);width:220px;height:24px;background:repeating-linear-gradient(90deg,#E53935 0px,#E53935 22px,#FFFFFF 22px,#FFFFFF 44px,#1565C0 44px,#1565C0 66px,#FFFFFF 66px,#FFFFFF 88px);border-radius:4px;opacity:0.7;transform:translateX(-50%) perspective(200px) rotateX(25deg)}
+
+  /* 수박 + 사람 영역 */
+  .melon-stage{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center}
+
+  .melon-wrap{position:relative;width:180px;height:180px;cursor:pointer;transition:transform 0.08s;z-index:2}
+  .melon-wrap:active{transform:scale(0.95)}
+  .melon-svg{width:100%;height:100%;filter:drop-shadow(0 6px 16px rgba(0,0,0,0.15))}
+
+  .split-container{position:absolute;inset:0;display:none;pointer-events:none;z-index:3}
+  .split-container.active{display:block}
+  .split-half{position:absolute;transition:transform 0.6s cubic-bezier(0.34,1.56,0.64,1)}
+  .split-half.left{left:-15px;top:10px;transform:translate(-30px,8px) rotate(-16deg)}
+  .split-half.right{right:-15px;top:10px;transform:translate(30px,8px) rotate(16deg)}
+
+  /* 말풍선 */
+  .speech{position:absolute;right:-80px;top:20px;background:white;border-radius:14px;padding:8px 14px;font-size:12px;color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.08);white-space:nowrap;z-index:5;max-width:160px;white-space:normal;line-height:1.4}
+  .speech::before{content:'';position:absolute;left:-6px;top:50%;transform:translateY(-50%);border:6px solid transparent;border-right-color:white}
+
+  /* 갈매기 */
+  .seagull{position:absolute;animation:fly 8s linear infinite}
+  .seagull::before,.seagull::after{content:'';position:absolute;width:14px;height:3px;background:#555;border-radius:50%;top:0}
+  .seagull::before{left:0;transform:rotate(-25deg)}
+  .seagull::after{left:12px;transform:rotate(25deg)}
+  .seagull-1{top:50px;animation-delay:-2s}
+  .seagull-2{top:70px;animation-delay:-5s;transform:scale(0.7)}
+  @keyframes fly{0%{left:-30px}100%{left:110%}}
+
+  /* 가이드 버튼 */
+  .tap-btn{margin-top:12px;padding:10px 28px;background:rgba(0,0,0,0.55);color:white;border:none;border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px);z-index:5;position:relative;font-family:'Noto Sans KR',sans-serif}
+
+  /* ===== 하단 영역 ===== */
+  .bottom-section{background:#F5F5F0;padding:0 16px}
+
+  /* 수박 조각 프로그레스 */
+  .progress-card{background:white;border-radius:20px;padding:20px;margin-top:-10px;position:relative;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+  .progress-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+  .progress-title span{color:var(--red)}
+  .progress-sub{font-size:13px;color:var(--text-sub);margin-bottom:14px}
+  .progress-pieces{display:flex;gap:6px;margin-bottom:10px;justify-content:center}
+  .piece-slot{width:32px;height:32px;position:relative}
+  .piece-slot svg{width:100%;height:100%}
+  .piece-empty{opacity:0.15}
+  .piece-filled{opacity:1;animation:pieceIn 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+  @keyframes pieceIn{0%{transform:scale(0) rotate(-30deg)}100%{transform:scale(1) rotate(0)}}
+  .progress-bar-wrap{height:5px;background:#EEE;border-radius:3px;overflow:hidden}
+  .progress-bar-fill{height:100%;background:linear-gradient(90deg,#66BB6A,var(--green));border-radius:3px;transition:width 0.4s ease;width:0%}
+
+  /* 하단 버튼 */
+  .bottom-btns{display:flex;gap:10px;margin-top:14px;padding-bottom:20px}
+  .bottom-btn{flex:1;padding:14px;background:white;border:none;border-radius:14px;font-size:14px;font-weight:700;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);font-family:'Noto Sans KR',sans-serif}
+  .bottom-btn:active{background:#F5F5F5}
+
+  /* 교환 버튼 */
+  .exchange-btn{width:100%;padding:16px;margin-top:12px;background:linear-gradient(135deg,#E8F5E9,#C8E6C9);border:1.5px solid rgba(46,125,50,0.2);border-radius:14px;font-size:16px;font-weight:700;color:var(--green);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'Noto Sans KR',sans-serif;transition:all 0.15s}
+  .exchange-btn:active{transform:scale(0.98)}
+  .exchange-btn.ready{background:linear-gradient(135deg,var(--green),#388E3C);color:white;border-color:transparent}
+  .exchange-btn.ready .exchange-sub{color:rgba(255,255,255,0.7)}
+  .exchange-sub{font-size:11px;font-weight:400;color:var(--text-sub)}
+
+  /* 토스트 */
+  .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);padding:12px 24px;background:rgba(0,0,0,0.8);color:white;border-radius:12px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all 0.3s;z-index:500;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* 광고 */
+  .ad-section{background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.04);margin-top:14px}
+  .ad-header{display:flex;align-items:center;gap:10px;padding:14px 16px}
+  .ad-logo{width:32px;height:32px;background:var(--red);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px}
+  .ad-name{font-size:14px;font-weight:600;color:var(--text)}
+  .ad-label{font-size:11px;color:var(--text-sub)}
+  .ad-image{width:100%;height:140px;background:linear-gradient(135deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center;color:#555;font-size:13px}
+  .ad-cta{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;font-size:14px;font-weight:600;color:var(--text);border-top:1px solid #F2F2F7}
+
+  /* ===== 스토리 모달 ===== */
+  .story-overlay{display:none;position:fixed;inset:0;z-index:300;background:linear-gradient(180deg,#0D1B2A 0%,#1B2838 30%,#1B3A4B 60%,#0D1B2A 100%);flex-direction:column;overflow-y:auto}
+  .story-overlay.active{display:flex}
+  .story-close{position:fixed;top:16px;right:16px;width:36px;height:36px;background:rgba(255,255,255,0.15);border:none;border-radius:50%;color:white;font-size:20px;cursor:pointer;z-index:301;display:flex;align-items:center;justify-content:center}
+  .story-content{padding:60px 28px 80px;color:rgba(255,255,255,0.6);font-size:16px;line-height:2;position:relative;min-height:100vh}
+  .story-content p{margin-bottom:20px}
+  .story-content .em{color:rgba(255,255,255,0.95);font-weight:700}
+  .story-content .highlight{color:#FF8A80;font-weight:700}
+
+  /* 스토리 장식 - 파도 */
+  .story-wave{position:absolute;width:100%;opacity:0.06}
+  .story-star{position:absolute;width:4px;height:4px;background:white;border-radius:50%;animation:twinkle 3s ease-in-out infinite alternate}
+  @keyframes twinkle{0%{opacity:0.2}100%{opacity:0.8}}
+
+  .story-back-btn{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);padding:14px 40px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:30px;color:white;font-size:15px;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);z-index:301;font-family:'Noto Sans KR',sans-serif}
+
+  /* EFFECTS */
+  .tap-ripple{position:absolute;border-radius:50%;background:rgba(232,51,74,0.12);pointer-events:none;animation:ripple 0.4s forwards}
+  @keyframes ripple{0%{transform:scale(0);opacity:1}100%{transform:scale(2.5);opacity:0}}
+  .particle{position:absolute;pointer-events:none;z-index:10;border-radius:50%}
+  .seed-p{width:7px;height:11px;background:#2C2C2C;border-radius:50% 50% 50% 50%/60% 60% 40% 40%}
+  @keyframes shake{0%,100%{transform:translate(0)}25%{transform:translate(-3px,1px)}50%{transform:translate(2px,-2px)}75%{transform:translate(-1px,2px)}}
+  .shaking{animation:shake 0.15s}
+  .flying-chunk{position:absolute;pointer-events:none;z-index:10}
+
+  /* 수박 사러가기 배너 */
+  .real-melon-banner{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding:18px 20px;background:linear-gradient(135deg,#FFF8E1,#FFECB3);border:1.5px solid rgba(255,160,0,0.2);border-radius:16px;cursor:pointer;transition:transform 0.15s}
+  .real-melon-banner:active{transform:scale(0.98)}
+  .rmb-badge{display:inline-block;padding:3px 8px;background:#FF6F00;color:white;border-radius:8px;font-size:10px;font-weight:700;margin-bottom:6px}
+  .rmb-title{font-size:16px;font-weight:700;color:var(--text)}
+  .rmb-sub{font-size:12px;color:var(--text-sub);margin-top:3px}
+  .rmb-icon{font-size:40px}
+
+  /* 수박 쇼핑 모달 */
+  .shop-overlay{display:none;position:fixed;inset:0;z-index:300;background:#F5F5F0;flex-direction:column;overflow-y:auto}
+  .shop-overlay.active{display:flex}
+  .shop-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:white;position:sticky;top:0;z-index:301;border-bottom:1px solid #EEE}
+  .shop-back{width:32px;height:32px;border:none;background:none;font-size:24px;cursor:pointer;color:var(--text);font-family:sans-serif}
+  .shop-header-title{font-size:16px;font-weight:700;color:var(--text)}
+  .shop-content{padding:0 16px 40px}
+  .shop-top-banner{text-align:center;padding:24px 16px;margin:16px 0;background:linear-gradient(135deg,#C8E6C9,#A5D6A7);border-radius:20px}
+  .shop-top-title{font-family:'Black Han Sans';font-size:22px;color:#1B5E20}
+  .shop-top-sub{font-size:13px;color:#2E7D32;margin-top:6px}
+  .shop-section-title{font-size:15px;font-weight:700;color:var(--text);margin:16px 0 10px;display:flex;align-items:center;gap:4px}
+
+  .shop-item{display:flex;gap:14px;padding:16px;background:white;border-radius:16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.04);cursor:pointer;transition:transform 0.15s;text-decoration:none;color:inherit}
+  .shop-item:active{transform:scale(0.98)}
+  .shop-item-img{width:90px;height:90px;border-radius:12px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;font-size:48px;flex-shrink:0}
+  .shop-item-info{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0}
+  .shop-item-rank{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:var(--red);color:white;border-radius:6px;font-size:11px;font-weight:700;flex-shrink:0}
+  .shop-item-rank.top3{background:var(--red)}
+  .shop-item-rank.normal{background:#9E9E9E}
+  .shop-item-name{font-size:14px;font-weight:600;color:var(--text);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .shop-item-tags{display:flex;gap:4px;flex-wrap:wrap}
+  .shop-item-tag{padding:2px 6px;background:#E8F5E9;border-radius:4px;font-size:10px;color:var(--green);font-weight:600}
+  .shop-item-price-row{display:flex;align-items:baseline;gap:6px}
+  .shop-item-price{font-family:'Black Han Sans';font-size:18px;color:var(--red)}
+  .shop-item-price small{font-size:12px;font-weight:400}
+  .shop-item-original{font-size:12px;color:#BBB;text-decoration:line-through}
+  .shop-item-delivery{font-size:11px;color:var(--text-sub)}
+
+  .shop-notice{margin-top:20px;padding:16px;background:#F9F9F9;border-radius:12px;font-size:11px;color:#AAA;line-height:1.6}
+  .shop-notice p{margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-back">‹</div>
+    <div class="header-title"><div class="header-icon">🍉</div>수박 깨기</div>
+  </div>
+  <div class="header-right"><span>⋯</span><span>✕</span></div>
+</div>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat-cell">
+    <div class="stat-value" id="totalPoints">0<small>원</small></div>
+    <div class="stat-label">😍 받은 포인트</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-value" id="totalPieces">0<small>개</small></div>
+    <div class="stat-label">🍉 모은 조각</div>
+  </div>
+</div>
+
+<!-- BEACH SCENE -->
+<div class="beach-scene">
+  <div class="sun"></div>
+  <div class="cloud cloud-1"></div>
+  <div class="cloud cloud-2"></div>
+  <div class="seagull seagull-1"></div>
+  <div class="seagull seagull-2"></div>
+
+  <div class="sea">
+    <div class="wave wave-1"></div>
+    <div class="wave wave-2"></div>
+    <div class="wave wave-3"></div>
+  </div>
+
+  <div class="sand-ground"></div>
+  <div class="mat"></div>
+
+  <div class="melon-stage">
+    <div style="position:relative">
+      <div class="melon-wrap" id="melonWrap" onclick="tapMelon(event)">
+        <svg class="melon-svg" viewBox="0 0 200 200">
+          <defs>
+            <radialGradient id="gO" cx="38%" cy="32%"><stop offset="0%" stop-color="#66BB6A"/><stop offset="50%" stop-color="#43A047"/><stop offset="100%" stop-color="#1B5E20"/></radialGradient>
+            <radialGradient id="gI" cx="45%" cy="38%"><stop offset="0%" stop-color="#FF8A80"/><stop offset="40%" stop-color="#FF5252"/><stop offset="100%" stop-color="#D32F2F"/></radialGradient>
+            <radialGradient id="gH" cx="35%" cy="25%"><stop offset="0%" stop-color="rgba(255,255,255,0.35)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></radialGradient>
+          </defs>
+          <ellipse cx="100" cy="180" rx="55" ry="8" fill="rgba(0,0,0,0.07)"/>
+          <ellipse cx="100" cy="105" rx="78" ry="74" fill="url(#gO)"/>
+          <path d="M42 75 Q52 105 42 138" stroke="#155D1E" stroke-width="10" fill="none" opacity="0.3" stroke-linecap="round"/>
+          <path d="M68 45 Q75 105 68 168" stroke="#155D1E" stroke-width="11" fill="none" opacity="0.3" stroke-linecap="round"/>
+          <path d="M96 35 Q100 105 96 178" stroke="#155D1E" stroke-width="11" fill="none" opacity="0.25" stroke-linecap="round"/>
+          <path d="M125 40 Q120 105 125 172" stroke="#155D1E" stroke-width="11" fill="none" opacity="0.3" stroke-linecap="round"/>
+          <path d="M150 52 Q145 105 150 160" stroke="#155D1E" stroke-width="10" fill="none" opacity="0.3" stroke-linecap="round"/>
+          <ellipse cx="100" cy="105" rx="78" ry="74" fill="url(#gH)"/>
+          <ellipse cx="76" cy="72" rx="28" ry="16" fill="rgba(255,255,255,0.12)" transform="rotate(-18,76,72)"/>
+          <ellipse cx="100" cy="33" rx="5" ry="3" fill="#4CAF50"/>
+          <path d="M96 34 Q92 18 99 23 Q100 14 104 22 Q108 16 105 34" fill="#66BB6A" stroke="#43A047" stroke-width="0.8"/>
+          <g id="crackGroup"></g>
+          <g id="innerGroup" opacity="0"></g>
+        </svg>
+      </div>
+
+      <!-- 쪼개진 수박 -->
+      <div class="split-container" id="splitContainer">
+        <svg class="split-half left" viewBox="0 0 110 200" width="100" height="180" style="filter:drop-shadow(0 5px 12px rgba(0,0,0,0.15))">
+          <defs>
+            <radialGradient id="gO2" cx="50%" cy="32%"><stop offset="0%" stop-color="#66BB6A"/><stop offset="50%" stop-color="#43A047"/><stop offset="100%" stop-color="#1B5E20"/></radialGradient>
+            <radialGradient id="gI2" cx="60%" cy="45%"><stop offset="0%" stop-color="#FF8A80"/><stop offset="30%" stop-color="#FF5252"/><stop offset="100%" stop-color="#C62828"/></radialGradient>
+            <clipPath id="lC"><path d="M100 32 Q100 105 100 180 Q50 182 22 142 Q0 112 22 70 Q42 36 100 32Z"/></clipPath>
+          </defs>
+          <g clip-path="url(#lC)">
+            <ellipse cx="100" cy="105" rx="78" ry="74" fill="url(#gO2)"/>
+            <path d="M42 75 Q52 105 42 138" stroke="#155D1E" stroke-width="10" fill="none" opacity="0.3" stroke-linecap="round"/>
+            <path d="M68 45 Q75 105 68 168" stroke="#155D1E" stroke-width="11" fill="none" opacity="0.3" stroke-linecap="round"/>
+          </g>
+          <path d="M98 38 Q98 105 98 175" stroke="rgba(255,255,255,0.6)" stroke-width="6" fill="none"/>
+          <path d="M95 42 Q85 105 95 172 Q55 162 35 135 Q22 112 35 78 Q55 48 95 42Z" fill="url(#gI2)"/>
+          <ellipse cx="68" cy="82" rx="3" ry="5" fill="#3E2723" transform="rotate(-15,68,82)"/>
+          <ellipse cx="80" cy="105" rx="3" ry="5" fill="#3E2723" transform="rotate(10,80,105)"/>
+          <ellipse cx="58" cy="115" rx="2.5" ry="4" fill="#3E2723" transform="rotate(-8,58,115)"/>
+          <ellipse cx="75" cy="135" rx="3" ry="5" fill="#3E2723" transform="rotate(12,75,135)"/>
+          <ellipse cx="62" cy="95" rx="2.5" ry="4" fill="#3E2723" transform="rotate(-20,62,95)"/>
+        </svg>
+        <svg class="split-half right" viewBox="90 0 110 200" width="100" height="180" style="filter:drop-shadow(0 5px 12px rgba(0,0,0,0.15))">
+          <defs>
+            <radialGradient id="gO3" cx="50%" cy="32%"><stop offset="0%" stop-color="#66BB6A"/><stop offset="50%" stop-color="#43A047"/><stop offset="100%" stop-color="#1B5E20"/></radialGradient>
+            <radialGradient id="gI3" cx="40%" cy="45%"><stop offset="0%" stop-color="#FF8A80"/><stop offset="30%" stop-color="#FF5252"/><stop offset="100%" stop-color="#C62828"/></radialGradient>
+            <clipPath id="rC"><path d="M100 32 Q100 105 100 180 Q150 182 178 142 Q200 112 178 70 Q158 36 100 32Z"/></clipPath>
+          </defs>
+          <g clip-path="url(#rC)">
+            <ellipse cx="100" cy="105" rx="78" ry="74" fill="url(#gO3)"/>
+            <path d="M125 40 Q120 105 125 172" stroke="#155D1E" stroke-width="11" fill="none" opacity="0.3" stroke-linecap="round"/>
+            <path d="M150 52 Q145 105 150 160" stroke="#155D1E" stroke-width="10" fill="none" opacity="0.3" stroke-linecap="round"/>
+          </g>
+          <path d="M102 38 Q102 105 102 175" stroke="rgba(255,255,255,0.6)" stroke-width="6" fill="none"/>
+          <path d="M105 42 Q115 105 105 172 Q145 162 165 135 Q178 112 165 78 Q145 48 105 42Z" fill="url(#gI3)"/>
+          <ellipse cx="132" cy="85" rx="3" ry="5" fill="#3E2723" transform="rotate(15,132,85)"/>
+          <ellipse cx="120" cy="108" rx="3" ry="5" fill="#3E2723" transform="rotate(-10,120,108)"/>
+          <ellipse cx="142" cy="118" rx="2.5" ry="4" fill="#3E2723" transform="rotate(8,142,118)"/>
+          <ellipse cx="128" cy="138" rx="3" ry="5" fill="#3E2723" transform="rotate(-12,128,138)"/>
+        </svg>
+      </div>
+
+      <div class="speech" id="speech">안녕하세요! 시원한 수박 깨볼까요? 🍉</div>
+    </div>
+  </div>
+
+  <button class="tap-btn" id="tapBtn">수박 눌러서 깨기!</button>
+</div>
+
+<!-- BOTTOM -->
+<div class="bottom-section">
+  <div class="progress-card">
+    <div class="progress-title">수박 <span>10조각</span> 모아서 최대 <span>100원</span>으로 교환해요</div>
+    <div class="progress-sub">모은 수박 조각 <strong id="pieceTxt">0개</strong></div>
+    <div class="progress-pieces" id="pieceSlots"></div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill"></div></div>
+  </div>
+
+  <div class="bottom-btns">
+    <button class="bottom-btn" onclick="shareApp()">📤 공유하기 <small style="color:var(--green);font-size:11px;margin-left:2px">+1조각</small></button>
+    <button class="bottom-btn" onclick="openStory()">📖 바닷가 수박 이야기</button>
+  </div>
+
+  <button class="exchange-btn" id="exchangeBtn" onclick="exchangePoints()">
+    <span>🍉 포인트로 교환하기</span>
+    <span class="exchange-sub" id="exchangeSub">10조각 모으면 교환 가능</span>
+  </button>
+
+  <!-- 토스트 -->
+  <div class="toast" id="toast"></div>
+
+  <div class="ad-section">
+    <div class="ad-header">
+      <div class="ad-logo">AD</div>
+      <div style="flex:1"><div class="ad-name">광고 파트너</div><div class="ad-label">광고</div></div>
+    </div>
+    <div class="ad-image">Toss IAA 광고 영역</div>
+    <div class="ad-cta"><span>더 알아보기</span><span>›</span></div>
+  </div>
+
+  <!-- 진짜 수박 사러가기 배너 -->
+  <div class="real-melon-banner" onclick="openMelonShop()">
+    <div class="rmb-left">
+      <div class="rmb-badge">🏆 최저가</div>
+      <div class="rmb-title">진짜 수박 사러가기</div>
+      <div class="rmb-sub">최저가 비교하고 제일 맛있는 수박 골라요!</div>
+    </div>
+    <div class="rmb-icon">🍉</div>
+  </div>
+
+  <div style="height:40px"></div>
+</div>
+
+<!-- 수박 최저가 비교 페이지 모달 -->
+<div class="shop-overlay" id="shopOverlay">
+  <div class="shop-header">
+    <button class="shop-back" onclick="closeShop()">‹</button>
+    <span class="shop-header-title">🍉 수박 최저가 비교</span>
+    <span style="width:32px"></span>
+  </div>
+  <div class="shop-content">
+    <div class="shop-top-banner">
+      <div class="shop-top-title">올여름 수박, 어디가 제일 쌀까?</div>
+      <div class="shop-top-sub">쿠팡 최저가 비교해서 맛있는 수박만 골랐어요 🍉</div>
+    </div>
+
+    <div class="shop-section-title">🔥 인기 수박 TOP</div>
+    <div class="shop-list" id="shopList"></div>
+
+    <div class="shop-notice">
+      <p>※ 쿠팡 파트너스 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다.</p>
+      <p>※ 가격은 변동될 수 있으며, 실제 가격은 링크에서 확인해주세요.</p>
+    </div>
+  </div>
+</div>
+
+<!-- STORY MODAL -->
+<div class="story-overlay" id="storyOverlay">
+  <button class="story-close" onclick="closeStory()">✕</button>
+  <div class="story-content">
+    <!-- 별 -->
+    <div class="story-star" style="top:40px;left:20%;animation-delay:0s"></div>
+    <div class="story-star" style="top:80px;right:15%;animation-delay:1s"></div>
+    <div class="story-star" style="top:160px;left:10%;animation-delay:0.5s"></div>
+    <div class="story-star" style="top:250px;right:25%;animation-delay:2s"></div>
+    <div class="story-star" style="top:400px;left:30%;animation-delay:1.5s"></div>
+    <div class="story-star" style="top:500px;right:10%;animation-delay:0.8s"></div>
+    <div class="story-star" style="top:650px;left:15%;animation-delay:2.5s"></div>
+    <div class="story-star" style="top:750px;right:20%;animation-delay:1.2s"></div>
+
+    <p>사실 이 수박에는</p>
+    <p>깊은 이야기가 있어요.</p>
+    <br>
+    <p class="em">어느 무더운 여름날,</p>
+    <br>
+    <p>바닷가에 작은 수박 하나가</p>
+    <p>파도에 떠밀려 왔어요.</p>
+    <br>
+    <p>아무도 거들떠보지 않는</p>
+    <p>작고 볼품없는 수박이었죠.</p>
+    <br>
+    <p>그날 해변에는</p>
+    <p>하루 종일 걸어온 한 아이가 있었어요.</p>
+    <br>
+    <p>목이 마르고, 배가 고팠지만</p>
+    <p>아이의 주머니는 텅 비어 있었죠.</p>
+    <br>
+    <p class="highlight">그 아이에게 필요했던 건</p>
+    <p class="highlight">거창한 무언가가 아니었어요.</p>
+    <br>
+    <p>한 입만 베어 물어도</p>
+    <p>다시 걸을 힘이 생기는,</p>
+    <p class="em">시원하고 달콤한 수박 한 조각이었어요.</p>
+    <br>
+    <p>그날 이후 아이는 생각했어요.</p>
+    <br>
+    <p>작고 흔한 수박 한 조각이라도</p>
+    <p>누군가에게는 오늘을 버티게 해주는</p>
+    <p>힘이 된다는 걸 알게 되었거든요.</p>
+    <br>
+    <p class="em">그래서 오늘도 수박을 깨요.</p>
+    <br>
+    <p>지친 누군가가</p>
+    <p>시원한 수박 한 조각에</p>
+    <p>잠깐이라도 웃을 수 있도록.</p>
+    <br><br>
+    <p class="highlight">당신이 깨는 수박 한 조각이</p>
+    <p class="highlight">누군가의 여름을 바꿀 수 있어요.</p>
+  </div>
+  <button class="story-back-btn" onclick="closeStory()">돌아가기</button>
+</div>
+
+<script>
+const state = {taps:0, maxTaps:9, pieces:0, totalPieces:0, totalPoints:0, needAd:false, cracked:false};
+
+const cracks=[
+  [{d:'M100 72 L102 90 L98 96',w:1.5,c:'#2E7D32',o:0.4}],
+  [{d:'M88 94 L100 97 L112 92',w:1.5,c:'#2E7D32',o:0.4}],
+  [{d:'M96 97 L100 115 L104 108',w:1.8,c:'#2E7D32',o:0.5}],
+  [{d:'M74 82 L88 96 L100 100 L114 94 L125 78',w:2,c:'#1B5E20',o:0.6},{d:'M82 120 L94 112 L100 105 L108 114 L118 122',w:2,c:'#1B5E20',o:0.5}],
+  [{d:'M94 55 L97 82 L100 100 L98 128 L95 148',w:2.5,c:'#1B5E20',o:0.7}],
+  [{d:'M54 78 L78 93 L100 100 L124 91 L144 75',w:2.5,c:'#C62828',o:0.6},{d:'M62 132 L85 120 L100 114 L118 122 L140 135',w:2.5,c:'#C62828',o:0.5}],
+  [{d:'M100 38 L98 75 L100 100 L102 130 L100 168',w:3,c:'#B71C1C',o:0.7},{d:'M48 105 L75 102 L100 100 L128 102 L155 105',w:2,c:'#C62828',o:0.5}],
+  [{d:'M98 34 L97 68 L100 100 L98 135 L98 175',w:3.5,c:'#B71C1C',o:0.85},{d:'M38 88 L68 96 L100 100 L135 96 L162 88',w:3,c:'#B71C1C',o:0.6}],
+];
+const innerReveal=[null,null,null,null,[{cx:100,cy:100,r:8}],[{cx:90,cy:92,r:12},{cx:112,cy:108,r:10}],[{cx:100,cy:100,r:18},{cx:85,cy:88,r:10},{cx:118,cy:115,r:10}],[{cx:100,cy:100,r:25},{cx:82,cy:85,r:13},{cx:120,cy:118,r:13}]];
+
+const speeches=['시원한 수박이에요! 🍉','조금만 더요!','금이 가기 시작했어요!','광고 보고 이어서 깨요!','거의 다 갈라져요!','속살이 보여요! 빨갛다!','조금만 더 힘!','바스락... 🔊','🎉 쪼개졌어요!'];
+
+// 수박 조각 슬롯 생성
+function initSlots(){
+  const el=document.getElementById('pieceSlots');
+  el.innerHTML='';
+  for(let i=0;i<10;i++){
+    const slot=document.createElement('div');
+    slot.className='piece-slot';
+    slot.innerHTML=`<svg viewBox="0 0 40 40" class="${i<state.pieces?'piece-filled':'piece-empty'}">
+      <path d="M20 5 Q35 5 35 20 Q35 35 20 35 Q5 35 5 20 Q5 5 20 5Z" fill="#E8334A"/>
+      <path d="M20 8 Q32 8 32 20 Q32 32 20 32 Q8 32 8 20 Q8 8 20 8Z" fill="#FF5252"/>
+      <ellipse cx="15" cy="18" rx="2" ry="3" fill="#3E2723"/>
+      <ellipse cx="25" cy="22" rx="2" ry="3" fill="#3E2723"/>
+      <ellipse cx="18" cy="26" rx="1.5" ry="2.5" fill="#3E2723"/>
+      <path d="M5 20 Q5 5 20 5" stroke="#2E7D32" stroke-width="3" fill="none"/>
+      <path d="M35 20 Q35 35 20 35" stroke="#2E7D32" stroke-width="3" fill="none"/>
+    </svg>`;
+    el.appendChild(slot);
+  }
+}
+
+function updateUI(){
+  document.getElementById('totalPoints').innerHTML=state.totalPoints+'<small>원</small>';
+  document.getElementById('totalPieces').innerHTML=state.totalPieces+'<small>개</small>';
+  document.getElementById('pieceTxt').textContent=state.pieces+'개';
+  document.getElementById('progressFill').style.width=(state.pieces/10*100)+'%';
+  initSlots();
+  updateExchangeBtn();
+}
+
+function tapMelon(e){
+  if(state.cracked) return;
+  if(state.needAd){showAdPrompt();return}
+  state.taps++;
+  const wrap=document.getElementById('melonWrap');
+  const rect=wrap.getBoundingClientRect();
+  const rx=e.clientX-rect.left,ry=e.clientY-rect.top;
+
+  wrap.classList.remove('shaking');void wrap.offsetWidth;wrap.classList.add('shaking');
+
+  const rp=document.createElement('div');
+  rp.className='tap-ripple';
+  rp.style.cssText=`left:${rx-30}px;top:${ry-30}px;width:60px;height:60px;`;
+  wrap.appendChild(rp);setTimeout(()=>rp.remove(),400);
+
+  if(state.taps>=3) spawnParticles(wrap,rx,ry,state.taps);
+
+  const cg=document.getElementById('crackGroup');
+  const idx=state.taps-1;
+  if(idx<cracks.length) cracks[idx].forEach(c=>{
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d',c.d);p.setAttribute('stroke',c.c);p.setAttribute('stroke-width',c.w);
+    p.setAttribute('fill','none');p.setAttribute('stroke-linecap','round');p.setAttribute('opacity',c.o);
+    cg.appendChild(p);
+  });
+
+  const ig=document.getElementById('innerGroup');
+  if(idx<innerReveal.length&&innerReveal[idx]){
+    ig.setAttribute('opacity','1');
+    innerReveal[idx].forEach(s=>{
+      const ci=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ci.setAttribute('cx',s.cx);ci.setAttribute('cy',s.cy);ci.setAttribute('r',s.r);
+      ci.setAttribute('fill','url(#gI)');ci.setAttribute('opacity','0.6');ig.appendChild(ci);
+      for(let i=0;i<2;i++){
+        const sd=document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+        sd.setAttribute('cx',s.cx-4+Math.random()*8);sd.setAttribute('cy',s.cy-4+Math.random()*8);
+        sd.setAttribute('rx','2');sd.setAttribute('ry','3');sd.setAttribute('fill','#3E2723');
+        sd.setAttribute('transform',`rotate(${-20+Math.random()*40},${s.cx},${s.cy})`);ig.appendChild(sd);
+      }
+    });
+  }
+
+  // 말풍선 업데이트
+  document.getElementById('speech').textContent=speeches[Math.min(idx,speeches.length-1)];
+  // 버튼 업데이트
+  const remaining=state.maxTaps-state.taps;
+  if(remaining>0) document.getElementById('tapBtn').textContent=`${remaining}번 더 눌러주세요!`;
+
+  if(state.taps===4){state.needAd=true;document.getElementById('tapBtn').textContent='광고 보고 이어서 깨기';return}
+
+  if(state.taps>=state.maxTaps){
+    state.cracked=true;
+    state.pieces=Math.min(state.pieces+1,10);
+    state.totalPieces++;
+    if(state.pieces>=10){state.totalPoints+=100;state.pieces=0}
+    updateUI();
+    document.getElementById('tapBtn').textContent='🎉 수박이 쪼개졌어요!';
+    splitWatermelon(wrap);
+  }
+}
+
+function splitWatermelon(wrap){
+  for(let i=0;i<16;i++) setTimeout(()=>spawnParticles(wrap,80+Math.random()*40,80+Math.random()*40,9),i*30);
+  const parent=wrap.parentElement;
+  for(let i=0;i<6;i++){
+    const chunk=document.createElement('div');chunk.className='flying-chunk';
+    const size=10+Math.random()*16;
+    const colors=['#FF5252','#FF8A80','#E8334A','#43A047','#2E7D32'];
+    chunk.style.cssText=`width:${size}px;height:${size}px;border-radius:${Math.random()>0.5?'50%':'30%'};background:${colors[i%colors.length]};left:50%;top:45%;position:absolute;`;
+    parent.appendChild(chunk);
+    const angle=(Math.PI*2/6)*i,dist=60+Math.random()*50;
+    chunk.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(angle)*dist}px),calc(-50% + ${Math.sin(angle)*dist}px)) scale(0) rotate(${200*Math.random()}deg)`,opacity:0}],{duration:700,fill:'forwards'});
+    setTimeout(()=>chunk.remove(),750);
+  }
+  setTimeout(()=>{wrap.style.display='none';document.getElementById('splitContainer').classList.add('active')},200);
+  setTimeout(resetMelon,3500);
+}
+
+function resetMelon(){
+  state.taps=0;state.needAd=false;state.cracked=false;
+  document.getElementById('crackGroup').innerHTML='';
+  document.getElementById('innerGroup').innerHTML='';
+  document.getElementById('innerGroup').setAttribute('opacity','0');
+  const wrap=document.getElementById('melonWrap');
+  wrap.style.display='';
+  document.getElementById('splitContainer').classList.remove('active');
+  wrap.style.transform='scale(0)';wrap.style.transition='transform 0.4s cubic-bezier(0.34,1.56,0.64,1)';
+  requestAnimationFrame(()=>{wrap.style.transform='scale(1)'});
+  setTimeout(()=>{wrap.style.transition='transform 0.08s'},500);
+  document.getElementById('speech').textContent='다시 한번 깨볼까요? 🍉';
+  document.getElementById('tapBtn').textContent='수박 눌러서 깨기!';
+}
+
+function showAdPrompt(){
+  const btn=document.getElementById('tapBtn');
+  let sec=3;btn.textContent=`📺 광고 시청 중... ${sec}초`;
+  const iv=setInterval(()=>{sec--;if(sec<=0){clearInterval(iv);state.needAd=false;btn.textContent='✅ 이어서 깨주세요!';document.getElementById('speech').textContent='좋아요! 이어서 깨요!';}else btn.textContent=`📺 광고 시청 중... ${sec}초`},1000);
+}
+
+function spawnParticles(parent,x,y,intensity){
+  const count=Math.min(intensity,8);
+  for(let i=0;i<count;i++){
+    const p=document.createElement('div');const isSeed=Math.random()>0.6;
+    p.className='particle'+(isSeed?' seed-p':'');
+    if(!isSeed){const s=4+Math.random()*8;p.style.width=s+'px';p.style.height=s+'px';p.style.background=['#FF5252','#FF8A80','#E8334A','#43A047','#FFE082'][Math.floor(Math.random()*5)]}
+    p.style.left=x+'px';p.style.top=y+'px';
+    const angle=Math.random()*Math.PI*2,dist=15+Math.random()*(20+intensity*5);
+    parent.appendChild(p);
+    p.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:`translate(${Math.cos(angle)*dist}px,${Math.sin(angle)*dist-15}px) scale(0)`,opacity:0}],{duration:350+Math.random()*200,fill:'forwards'});
+    setTimeout(()=>p.remove(),600);
+  }
+}
+
+function openStory(){document.getElementById('storyOverlay').classList.add('active');document.body.style.overflow='hidden'}
+function closeStory(){document.getElementById('storyOverlay').classList.remove('active');document.body.style.overflow=''}
+
+function shareApp(){
+  // 실제 배포 시 Toss 공유 SDK 연동
+  if(navigator.share){
+    navigator.share({title:'수박 깨기',text:'수박 깨고 토스 포인트 받자! 🍉',url:window.location.href}).then(()=>{
+      state.pieces=Math.min(state.pieces+1,10);
+      state.totalPieces++;
+      updateUI();
+      showToast('🍉 공유 완료! 수박 조각 +1');
+    }).catch(()=>{});
+  } else {
+    state.pieces=Math.min(state.pieces+1,10);
+    state.totalPieces++;
+    updateUI();
+    showToast('🍉 공유 완료! 수박 조각 +1');
+  }
+}
+
+function exchangePoints(){
+  if(state.pieces<10){
+    showToast(`🍉 수박 조각이 부족해요! (${state.pieces}/10)`);
+    // 교환 버튼 흔들기
+    const btn=document.getElementById('exchangeBtn');
+    btn.style.animation='none';btn.offsetHeight;
+    btn.style.animation='shake 0.3s';
+    return;
+  }
+  state.pieces=0;
+  state.totalPoints+=100;
+  updateUI();
+  showToast('🎉 100원 교환 완료! 토스 포인트로 적립됐어요');
+}
+
+function updateExchangeBtn(){
+  const btn=document.getElementById('exchangeBtn');
+  const sub=document.getElementById('exchangeSub');
+  if(state.pieces>=10){
+    btn.classList.add('ready');
+    sub.textContent='지금 바로 교환할 수 있어요!';
+  } else {
+    btn.classList.remove('ready');
+    sub.textContent=`${10-state.pieces}조각 더 모으면 교환 가능`;
+  }
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// INIT
+initSlots();
+renderShopItems();
+
+// ===== 수박 쇼핑 =====
+const melonProducts = [
+  { name: '고당도 흑피 수박 6kg 이상', price: '14,900', original: '25,000', tags: ['로켓배송', '고당도'], delivery: '내일 새벽 도착', link: 'https://link.coupang.com/DUMMY_LINK_1' },
+  { name: '프리미엄 당도선별 수박 7~8kg', price: '19,800', original: '32,000', tags: ['당도보장', '프리미엄'], delivery: '로켓프레시', link: 'https://link.coupang.com/DUMMY_LINK_2' },
+  { name: '함안 꿀수박 소과 4~5kg', price: '11,900', original: '18,000', tags: ['산지직송', '소과'], delivery: '내일 도착', link: 'https://link.coupang.com/DUMMY_LINK_3' },
+  { name: '블랙망고 수박 6kg 1통', price: '16,500', original: '28,000', tags: ['인기', '고당도'], delivery: '로켓배송', link: 'https://link.coupang.com/DUMMY_LINK_4' },
+  { name: '고창 명품 수박 8kg 이상', price: '22,900', original: '35,000', tags: ['GAP인증', '대과'], delivery: '산지직송', link: 'https://link.coupang.com/DUMMY_LINK_5' },
+  { name: '미니 애플수박 1.5~2kg 2통', price: '13,900', original: '20,000', tags: ['미니', '1인가구'], delivery: '내일 새벽 도착', link: 'https://link.coupang.com/DUMMY_LINK_6' },
+  { name: '당도선별 씨없는 수박 5~6kg', price: '17,500', original: '27,000', tags: ['씨없는', '편의'], delivery: '로켓프레시', link: 'https://link.coupang.com/DUMMY_LINK_7' },
+  { name: '논산 꿀수박 특대 10kg 이상', price: '26,900', original: '40,000', tags: ['특대과', '파티용'], delivery: '산지직송', link: 'https://link.coupang.com/DUMMY_LINK_8' },
+  { name: '제주 흑수박 6~7kg 당도보장', price: '21,500', original: '33,000', tags: ['제주산', '당도보장'], delivery: '로켓배송', link: 'https://link.coupang.com/DUMMY_LINK_9' },
+  { name: '반쪽 컷팅 수박 2.5~3kg', price: '8,900', original: '14,000', tags: ['컷팅', '소용량'], delivery: '내일 새벽 도착', link: 'https://link.coupang.com/DUMMY_LINK_10' },
+  { name: '성주 참외농원 꿀수박 7kg', price: '18,900', original: '29,000', tags: ['농장직송', '고당도'], delivery: '산지직송', link: 'https://link.coupang.com/DUMMY_LINK_11' },
+  { name: '프리미엄 수박 선물세트 8kg', price: '29,900', original: '45,000', tags: ['선물용', '포장'], delivery: '로켓배송', link: 'https://link.coupang.com/DUMMY_LINK_12' },
+];
+
+function renderShopItems(){
+  const list = document.getElementById('shopList');
+  list.innerHTML = melonProducts.map((p,i) => `
+    <a class="shop-item" href="${p.link}" target="_blank" rel="noopener">
+      <div class="shop-item-img">🍉</div>
+      <div class="shop-item-info">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="shop-item-rank ${i<3?'top3':'normal'}">${i+1}</span>
+          <span class="shop-item-name">${p.name}</span>
+        </div>
+        <div class="shop-item-tags">${p.tags.map(t=>`<span class="shop-item-tag">${t}</span>`).join('')}</div>
+        <div class="shop-item-price-row">
+          <span class="shop-item-price">${p.price}<small>원</small></span>
+          <span class="shop-item-original">${p.original}원</span>
+        </div>
+        <div class="shop-item-delivery">${p.delivery}</div>
+      </div>
+    </a>
+  `).join('');
+}
+
+function openMelonShop(){document.getElementById('shopOverlay').classList.add('active');document.body.style.overflow='hidden'}
+function closeShop(){document.getElementById('shopOverlay').classList.remove('active');document.body.style.overflow=''}
+
+// ===== TOSS LOGIN + FIREBASE =====
+const VERCEL_API = 'https://watermelon-break.vercel.app';
+let currentUser = null;
+
+// Firebase SDK (CDN)
+(function loadFirebase(){
+  const s1 = document.createElement('script');
+  s1.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js';
+  s1.onload = () => {
+    const s2 = document.createElement('script');
+    s2.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js';
+    s2.onload = () => {
+      firebase.initializeApp({
+        apiKey: "AIzaSyDdVfE2nXlPtJv6po6ZNwwNxKuXErwU4QQ",
+        authDomain: "watermelon-break.firebaseapp.com",
+        projectId: "watermelon-break",
+        storageBucket: "watermelon-break.firebasestorage.app",
+        messagingSenderId: "608010906382",
+        appId: "1:608010906382:web:772ab7b93d6b292328055f",
+        measurementId: "G-T5Z48Q1HYD"
+      });
+      window.db = firebase.firestore();
+      console.log('Firebase initialized');
+      initTossLogin();
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
+})();
+
+// 토스 앱인토스 SDK 로드
+function initTossLogin() {
+  // 토스 미니앱 환경인지 확인
+  if (window.TossAppBridge) {
+    tossLogin();
+  } else {
+    // 웹 테스트 환경 — 로컬 테스트용 더미 유저
+    console.log('Not in Toss app, using test user');
+    currentUser = { uid: 'test_user_001' };
+    loadUserData();
+  }
+}
+
+async function tossLogin() {
+  try {
+    // 토스 앱인토스 appLogin
+    const result = await window.TossAppBridge.call('appLogin', {});
+    if (result && result.authorizationCode) {
+      // Vercel API로 토큰 교환
+      const res = await fetch(VERCEL_API + '/api/toss-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: result.authorizationCode })
+      });
+      const data = await res.json();
+      if (data.success) {
+        currentUser = { uid: 'toss_' + data.userKey };
+        loadUserData();
+      }
+    }
+  } catch (e) {
+    console.error('Toss login error:', e);
+  }
+}
+
+// Firestore에서 유저 데이터 로드
+async function loadUserData() {
+  if (!currentUser || !window.db) return;
+  try {
+    const doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists) {
+      const d = doc.data();
+      state.pieces = d.pieces || 0;
+      state.totalPieces = d.totalPieces || 0;
+      state.totalPoints = d.totalPoints || 0;
+    } else {
+      // 신규 유저
+      await db.collection('users').doc(currentUser.uid).set({
+        pieces: 0, totalPieces: 0, totalPoints: 0,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    updateUI();
+  } catch (e) {
+    console.error('Load user data error:', e);
+  }
+}
+
+// Firestore에 유저 데이터 저장
+async function saveUserData() {
+  if (!currentUser || !window.db) return;
+  try {
+    await db.collection('users').doc(currentUser.uid).update({
+      pieces: state.pieces,
+      totalPieces: state.totalPieces,
+      totalPoints: state.totalPoints,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) {
+    console.error('Save user data error:', e);
+  }
+}
+
+// 기존 updatePieces에 저장 연동
+const _origUpdatePieces = updatePieces;
+updatePieces = function() {
+  // 기존 UI 업데이트는 updateUI에서 처리
+};
+
+// updateUI 후 자동 저장
+const _origUpdateUI = updateUI;
+updateUI = function() {
+  _origUpdateUI();
+  saveUserData();
+};
+</script>
+</body>
+</html>
