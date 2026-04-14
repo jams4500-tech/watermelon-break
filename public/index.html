@@ -324,7 +324,7 @@
   <!-- 토스트 -->
   <div class="toast" id="toast"></div>
 
-  <div id="adBannerList" style="width:100%;height:96px;margin-top:14px"></div>
+  <div class="toss-banner-ad" style="width:100%;min-height:96px;margin-top:14px;display:block" data-ad-unit-id="ait-ad-test-banner-id"></div>
 
   <!-- 진짜 수박 사러가기 배너 -->
   <div class="real-melon-banner" onclick="openMelonShop()">
@@ -560,8 +560,7 @@ function resetMelon(){
 function showAdPrompt(){
   const btn=document.getElementById('tapBtn');
 
-  const loaders = _getLoaders();
-  if (loaders.length === 0) {
+  if (typeof loadFullScreenAd !== 'function') {
     state.needAd=false;
     btn.textContent='✅ 이어서 깨주세요!';
     document.getElementById('speech').textContent='(웹 테스트) 이어서 깨요!';
@@ -571,72 +570,18 @@ function showAdPrompt(){
   btn.disabled=true;
   btn.textContent='📺 광고 재생 중...';
 
-  const onReward = () => {
-    state.needAd=false;
-    btn.disabled=false;
-    btn.textContent='✅ 이어서 깨주세요!';
-    document.getElementById('speech').textContent='좋아요! 이어서 깨요!';
-  };
-  const onDismiss = () => {
-    btn.disabled=false;
-    btn.textContent='광고 보고 이어서 깨기';
-  };
-
-  // 프리로드된 리워드 광고가 있으면 바로 재생
-  if (_fsAd.rewarded.loaded) {
-    showRewardedAd(onReward, onDismiss);
-    return;
-  }
-
-  // 즉석 로드 → loaded 되면 재생, 각 API 순회
-  console.log('[Ad] rewarded 즉석 로드 시도');
-  let shown = false;
-  let idx = 0;
-
-  const tryNext = () => {
-    if (shown || idx >= loaders.length) {
-      if (!shown) {
-        showToast('광고를 불러올 수 없어요.');
-        onDismiss();
-      }
-      return;
+  showRewardedAd(
+    () => {
+      state.needAd=false;
+      btn.disabled=false;
+      btn.textContent='✅ 이어서 깨주세요!';
+      document.getElementById('speech').textContent='좋아요! 이어서 깨요!';
+    },
+    () => {
+      btn.disabled=false;
+      btn.textContent='광고 보고 이어서 깨기';
     }
-    const L = loaders[idx++];
-    console.log('[Ad:load:inline] try', L.name);
-    try {
-      const cleanup = L.load({
-        options: { adGroupId: REWARDED_AD_ID },
-        onEvent: (e) => {
-          console.log('[Ad:load:inline]', L.name, e.type);
-          if (e.type === 'loaded' && !shown) {
-            shown = true;
-            _fsAd.rewarded.loaded = true;
-            _fsAd.rewarded.loading = false;
-            _fsAd.rewarded.activeApi = L;
-            _fsAd.rewarded.cleanup = cleanup;
-            showRewardedAd(onReward, onDismiss);
-          }
-        },
-        onError: (err) => {
-          console.warn('[Ad:load:inline] error', L.name, err && (err.message || err));
-          try { cleanup && cleanup(); } catch (e) {}
-          tryNext();
-        }
-      });
-    } catch (e) {
-      console.warn('[Ad:load:inline] throw', L.name, e && e.message);
-      tryNext();
-    }
-  };
-  tryNext();
-
-  setTimeout(() => {
-    if (!shown) {
-      console.warn('[Ad] rewarded 로드 타임아웃');
-      showToast('광고 로드 시간이 초과됐어요. 다시 시도해주세요.');
-      onDismiss();
-    }
-  }, 8000);
+  );
 }
 
 function spawnParticles(parent,x,y,intensity){
@@ -796,172 +741,87 @@ const TOSS_PROMOTION_CODE = 'TEST_01KP2CEEBH4CJ9AEEP8NNMQ30W';
 const EXCHANGE_AMOUNT = 100;
 let currentUser = null;
 
-// ===== TOSS ADS (공식 문서 기준) =====
-const BANNER_AD_ID = 'ait-ad-test-banner-id';
+// ===== TOSS ADS (하루철학 패턴) =====
 const INTERSTITIAL_AD_ID = 'ait-ad-test-interstitial-id';
 const REWARDED_AD_ID = 'ait-ad-test-rewarded-id';
 
-// 전면/리워드 광고 상태
-const _fsAd = {
-  interstitial: { loaded: false, loading: false, unregister: null },
-  rewarded:     { loaded: false, loading: false, unregister: null },
-};
-
-// ver2(loadFullScreenAd) 우선, 실패 시 ver1(GoogleAdMob.loadAppsInTossAdMob) fallback
-function _getLoaders() {
-  const loaders = [];
-  if (typeof window.loadFullScreenAd === 'function') {
-    loaders.push({ name: 'ver2', load: window.loadFullScreenAd, show: window.showFullScreenAd });
-  }
-  if (window.GoogleAdMob && typeof window.GoogleAdMob.loadAppsInTossAdMob === 'function') {
-    loaders.push({
-      name: 'ver1',
-      load: window.GoogleAdMob.loadAppsInTossAdMob,
-      show: window.GoogleAdMob.showAppsInTossAdMob
-    });
-  }
-  return loaders;
-}
-
-function _preloadFullScreen(kind, adGroupId) {
-  const s = _fsAd[kind];
-  if (s.loaded || s.loading) return;
-  s.loading = true;
-  s.activeApi = null;
-
-  const loaders = _getLoaders();
-  if (loaders.length === 0) {
-    console.warn('[Ad] 사용 가능한 SDK 없음');
-    s.loading = false;
+function initAds() {
+  if (typeof TossAds === 'undefined' || !TossAds || !TossAds.initialize) {
+    console.warn('TossAds SDK 미로드');
     return;
   }
-
-  let idx = 0;
-  const tryNext = () => {
-    if (idx >= loaders.length) {
-      console.warn('[Ad] 모든 API 로드 실패', kind);
-      s.loading = false;
-      return;
-    }
-    const L = loaders[idx++];
-    console.log('[Ad] preload try', L.name, kind, adGroupId);
-    try {
-      const cleanup = L.load({
-        options: { adGroupId },
-        onEvent: (e) => {
-          console.log('[Ad:load]', L.name, kind, e.type);
-          if (e.type === 'loaded') {
-            s.loaded = true;
-            s.loading = false;
-            s.activeApi = L;
-            s.cleanup = cleanup;
-          }
-        },
-        onError: (err) => {
-          console.warn('[Ad:load] error', L.name, kind, err && (err.message || err));
-          try { cleanup && cleanup(); } catch (e) {}
-          if (!s.loaded) { tryNext(); }
-        }
-      });
-    } catch (e) {
-      console.warn('[Ad:load] throw', L.name, kind, e && e.message);
-      tryNext();
-    }
-  };
-  tryNext();
-}
-
-function _showFullScreen(kind, adGroupId, onRewarded, onDismiss) {
-  const s = _fsAd[kind];
-  if (!s.loaded || !s.activeApi) {
-    console.warn('[Ad] show 불가 — 아직 로드 안됨', kind);
-    onDismiss && onDismiss();
-    _preloadFullScreen(kind, adGroupId);
-    return;
-  }
-  const api = s.activeApi;
-  console.log('[Ad] show', api.name, kind, adGroupId);
-  let rewardedFired = false;
-  try {
-    api.show({
-      options: { adGroupId },
-      onEvent: (e) => {
-        console.log('[Ad:show]', api.name, kind, e.type, e);
-        if (e.type === 'userEarnedReward') {
-          rewardedFired = true;
-          onRewarded && onRewarded(e.data);
-        }
-        if (e.type === 'dismissed' || e.type === 'failedToShow') {
-          s.loaded = false;
-          s.activeApi = null;
-          if (!rewardedFired) onDismiss && onDismiss();
-          setTimeout(() => _preloadFullScreen(kind, adGroupId), 300);
-        }
-      },
-      onError: (err) => {
-        console.warn('[Ad:show] error', api.name, kind, err && (err.message || err));
-        s.loaded = false;
-        s.activeApi = null;
-        onDismiss && onDismiss();
-        setTimeout(() => _preloadFullScreen(kind, adGroupId), 300);
-      }
-    });
-  } catch (e) {
-    console.warn('[Ad:show] throw', api.name, kind, e && e.message);
-    onDismiss && onDismiss();
-  }
-}
-
-function showInterstitialAd(onDismiss) {
-  _showFullScreen('interstitial', INTERSTITIAL_AD_ID, null, onDismiss);
-}
-function showRewardedAd(onRewarded, onDismiss) {
-  _showFullScreen('rewarded', REWARDED_AD_ID, onRewarded, onDismiss);
-}
-
-function initTossAds() {
-  const banner = document.getElementById('adBannerList');
-
-  // 전면/리워드 미리 로드
-  _preloadFullScreen('interstitial', INTERSTITIAL_AD_ID);
-  _preloadFullScreen('rewarded', REWARDED_AD_ID);
-
-  // 배너
-  if (!banner) return;
-  if (typeof window.TossAds === 'undefined' || !window.TossAds.initialize) {
-    console.log('[TossAds] SDK 없음 (웹 환경)');
-    banner.style.display = 'none';
-    return;
-  }
-  try {
-    window.TossAds.initialize({
-      callbacks: {
-        onInitialized: () => {
-          console.log('[TossAds] 초기화 완료');
+  TossAds.initialize({
+    callbacks: {
+      onInitialized: () => {
+        console.log('[TossAds] 초기화 완료');
+        document.querySelectorAll('[data-ad-unit-id]').forEach(el => {
+          const adGroupId = el.dataset.adUnitId;
           try {
-            const result = window.TossAds.attachBanner(BANNER_AD_ID, banner, {
-              theme: 'auto', tone: 'blackAndWhite', variant: 'expanded',
-              callbacks: {
-                onAdRendered: (p) => console.log('[Banner] rendered', p.slotId),
-                onAdImpression: (p) => console.log('[Banner] impression', p.slotId),
-                onNoFill: (p) => { console.log('[Banner] noFill', p); banner.style.display = 'none'; },
-                onAdFailedToRender: (p) => { console.warn('[Banner] renderFail', p.error); banner.style.display = 'none'; },
-              }
-            });
-            window._bannerHandle = result;
-          } catch (e) { console.warn('[Banner] attach throw', e); banner.style.display = 'none'; }
-        },
-        onInitializationFailed: (e) => { console.warn('[TossAds] init fail', e); banner.style.display = 'none'; },
-      }
-    });
-  } catch (e) { console.warn('[TossAds] init throw', e); banner.style.display = 'none'; }
+            TossAds.attachBanner(adGroupId, el, { theme: 'auto' });
+            console.log('[Banner] attach', adGroupId);
+          } catch (e) {
+            console.error('[Banner] attach 실패', adGroupId, e);
+          }
+        });
+      },
+      onInitializationFailed: (err) => console.error('[TossAds] 초기화 실패', err),
+    },
+  });
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initTossAds);
-} else {
-  initTossAds();
+async function showInterstitialAd() {
+  try {
+    if (typeof loadFullScreenAd !== 'function' || typeof showFullScreenAd !== 'function') return;
+    await new Promise((resolve, reject) => {
+      loadFullScreenAd({
+        options: { adGroupId: INTERSTITIAL_AD_ID },
+        onEvent: (e) => { if (e.type === 'loaded') resolve(); },
+        onError: reject,
+      });
+    });
+    await new Promise((resolve, reject) => {
+      showFullScreenAd({
+        options: { adGroupId: INTERSTITIAL_AD_ID },
+        onEvent: (e) => { if (e.type === 'dismissed') resolve(); },
+        onError: reject,
+      });
+    });
+  } catch (e) { console.error('전면 광고 오류', e); }
 }
+
+async function showRewardedAd(onRewarded, onDismiss) {
+  try {
+    if (typeof loadFullScreenAd !== 'function' || typeof showFullScreenAd !== 'function') {
+      throw new Error('SDK 미로드');
+    }
+    await new Promise((resolve, reject) => {
+      loadFullScreenAd({
+        options: { adGroupId: REWARDED_AD_ID },
+        onEvent: (e) => { if (e.type === 'loaded') resolve(); },
+        onError: reject,
+      });
+    });
+    let rewarded = false;
+    await new Promise((resolve, reject) => {
+      showFullScreenAd({
+        options: { adGroupId: REWARDED_AD_ID },
+        onEvent: (e) => {
+          console.log('[Ad:show]', e.type);
+          if (e.type === 'userEarnedReward') rewarded = true;
+          if (e.type === 'dismissed' || e.type === 'userEarnedReward') resolve();
+        },
+        onError: reject,
+      });
+    });
+    if (rewarded) { onRewarded && onRewarded(); }
+    else { onDismiss && onDismiss(); }
+  } catch (e) {
+    console.error('리워드 광고 오류', e);
+    onDismiss && onDismiss();
+  }
+}
+
+initAds();
 
 // Firebase SDK (CDN)
 (function loadFirebase(){
