@@ -119,6 +119,16 @@
 
   /* 토스트 */
   .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);padding:12px 24px;background:rgba(0,0,0,0.8);color:white;border-radius:12px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all 0.3s;z-index:500;white-space:nowrap}
+
+  .splash{position:fixed;inset:0;background:linear-gradient(180deg,#4FC3F7 0%,#2E7D32 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;z-index:9000;transition:opacity 0.4s}
+  .splash.hidden{opacity:0;pointer-events:none}
+  .splash-logo{font-size:72px;animation:bounce 1.2s infinite ease-in-out}
+  .splash-title{color:#fff;font-weight:900;font-size:26px;letter-spacing:-0.5px;text-shadow:0 2px 8px rgba(0,0,0,0.2)}
+  .splash-sub{color:rgba(255,255,255,0.92);font-size:14px}
+  .splash-spinner{width:28px;height:28px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  body.loading{overflow:hidden}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
   /* 광고 */
@@ -195,7 +205,16 @@
   .shop-notice p{margin-bottom:4px}
 </style>
 </head>
-<body>
+<body class="loading">
+
+<!-- 로그인 전 스플래시 -->
+<div class="splash" id="splash">
+  <div class="splash-logo">🍉</div>
+  <div class="splash-title">수박 깨기</div>
+  <div class="splash-sub">토스 로그인으로 시작해요</div>
+  <div class="splash-spinner"></div>
+</div>
+
 
 <!-- TAB LABEL (non-interactive, sits below Toss nav) -->
 <div class="header">
@@ -787,6 +806,31 @@ function _snapshotGlobals(){
   _dbg(`globals TossAds=${g} load=${l} show=${s} SpaceKit=${k} AppsInToss=${aits} Emitter=${emitter} RNWebView=${rnwv}`);
 }
 
+// 리워드 광고 프리로드 상태
+let _rewardedReady = false;
+let _rewardedLoadUnsub = null;
+
+function preloadRewarded(){
+  if (typeof loadFullScreenAd !== 'function') return;
+  if (_rewardedReady) return;
+  _dbg('rewarded preload 시작');
+  try {
+    _rewardedLoadUnsub = loadFullScreenAd({
+      options: { adGroupId: REWARDED_AD_ID },
+      onEvent: (e) => {
+        _dbg('rw:preload '+e.type);
+        if (e.type === 'loaded') _rewardedReady = true;
+      },
+      onError: (err) => {
+        _dbg('rw:preload ERR '+(err&&err.message||err));
+        _rewardedReady = false;
+      }
+    });
+  } catch (e) {
+    _dbg('THROW rewarded preload: '+(e&&e.message));
+  }
+}
+
 function initAds() {
   _snapshotGlobals();
   if (typeof TossAds === 'undefined' || !TossAds || !TossAds.initialize) {
@@ -823,6 +867,8 @@ function initAds() {
   } catch (e) {
     _dbg('THROW TossAds.initialize: '+(e&&e.message));
   }
+  // 리워드 광고 미리 로드 (show 시 지연 최소화)
+  preloadRewarded();
 }
 
 async function showInterstitialAd() {
@@ -852,18 +898,22 @@ async function showInterstitialAd() {
 
 async function showRewardedAd(onRewarded, onDismiss) {
   try {
-    _snapshotGlobals();
-    if (typeof loadFullScreenAd !== 'function' || typeof showFullScreenAd !== 'function') {
-      throw new Error('SDK fn 없음');
-    }
-    _dbg('rewarded load 시작 '+REWARDED_AD_ID.slice(-8));
-    await new Promise((resolve, reject) => {
-      loadFullScreenAd({
-        options: { adGroupId: REWARDED_AD_ID },
-        onEvent: (e) => { _dbg('rw:load '+e.type); if (e.type === 'loaded') resolve(); },
-        onError: (err)=>{ _dbg('rw:load ERR '+(err&&err.message||err)); reject(err); },
+    if (typeof showFullScreenAd !== 'function') throw new Error('SDK fn 없음');
+
+    // 프리로드 안 됐으면 지금 로드
+    if (!_rewardedReady) {
+      _dbg('rewarded 미준비 — 즉석 로드');
+      await new Promise((resolve, reject) => {
+        loadFullScreenAd({
+          options: { adGroupId: REWARDED_AD_ID },
+          onEvent: (e) => { _dbg('rw:load '+e.type); if (e.type === 'loaded') { _rewardedReady = true; resolve(); } },
+          onError: (err) => { _dbg('rw:load ERR '+(err&&err.message||err)); reject(err); },
+        });
       });
-    });
+    } else {
+      _dbg('rewarded 프리로드 사용 → 바로 show');
+    }
+
     _dbg('rewarded show 시작');
     let rewarded = false;
     await new Promise((resolve, reject) => {
@@ -872,15 +922,22 @@ async function showRewardedAd(onRewarded, onDismiss) {
         onEvent: (e) => {
           _dbg('rw:show '+e.type);
           if (e.type === 'userEarnedReward') rewarded = true;
-          if (e.type === 'dismissed' || e.type === 'userEarnedReward') resolve();
+          if (e.type === 'dismissed' || e.type === 'userEarnedReward' || e.type === 'failedToShow') resolve();
         },
-        onError: (err)=>{ _dbg('rw:show ERR '+(err&&err.message||err)); reject(err); },
+        onError: (err) => { _dbg('rw:show ERR '+(err&&err.message||err)); reject(err); },
       });
     });
-    if (rewarded) { onRewarded && onRewarded(); }
-    else { onDismiss && onDismiss(); }
+
+    // show 후 다음 광고 미리 로드
+    _rewardedReady = false;
+    setTimeout(preloadRewarded, 300);
+
+    if (rewarded) onRewarded && onRewarded();
+    else onDismiss && onDismiss();
   } catch (e) {
     _dbg('THROW rewarded: '+(e&&e.message));
+    _rewardedReady = false;
+    setTimeout(preloadRewarded, 500);
     onDismiss && onDismiss();
   }
 }
@@ -913,7 +970,17 @@ initAds();
   document.head.appendChild(s1);
 })();
 
-// 토스 앱인토스 SDK 로드
+function hideSplash() {
+  const sp = document.getElementById('splash');
+  if (sp) sp.classList.add('hidden');
+  document.body.classList.remove('loading');
+  setTimeout(() => { if (sp && sp.parentNode) sp.parentNode.removeChild(sp); }, 500);
+}
+// 안전장치: Firebase/네트워크 문제로 로그인 흐름 못 탈 경우 12초 뒤 강제 해제
+setTimeout(() => {
+  if (document.body.classList.contains('loading')) hideSplash();
+}, 12000);
+
 function initTossLogin() {
   // 토스앱 환경 = window.appLogin 존재
   if (typeof window.appLogin === 'function') {
@@ -922,15 +989,14 @@ function initTossLogin() {
     console.log('Not in Toss app, using test user');
     currentUser = { uid: 'test_user_001' };
     loadUserData();
+    hideSplash();
   }
 }
 
 async function tossLogin() {
   try {
-    // 토스 앱인토스 appLogin (SDK window export)
     const result = await window.appLogin({});
     if (result && result.authorizationCode) {
-      // Vercel API로 토큰 교환
       const res = await fetch(VERCEL_API + '/api/toss-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -940,10 +1006,20 @@ async function tossLogin() {
       if (data.success) {
         currentUser = { uid: 'toss_' + data.userKey };
         loadUserData();
+      } else {
+        currentUser = { uid: 'toss_guest_' + Date.now() };
+        loadUserData();
       }
+    } else {
+      currentUser = { uid: 'toss_guest_' + Date.now() };
+      loadUserData();
     }
   } catch (e) {
     console.error('Toss login error:', e);
+    currentUser = { uid: 'toss_guest_' + Date.now() };
+    loadUserData();
+  } finally {
+    hideSplash();
   }
 }
 
@@ -984,12 +1060,6 @@ async function saveUserData() {
     console.error('Save user data error:', e);
   }
 }
-
-// 기존 updatePieces에 저장 연동
-const _origUpdatePieces = updatePieces;
-updatePieces = function() {
-  // 기존 UI 업데이트는 updateUI에서 처리
-};
 
 // updateUI 후 자동 저장
 const _origUpdateUI = updateUI;
