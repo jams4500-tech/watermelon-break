@@ -187,7 +187,8 @@
 
   .shop-item{display:flex;gap:14px;padding:16px;background:white;border-radius:16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.04);cursor:pointer;transition:transform 0.15s;text-decoration:none;color:inherit}
   .shop-item:active{transform:scale(0.98)}
-  .shop-item-img{width:90px;height:90px;border-radius:12px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;font-size:48px;flex-shrink:0}
+  .shop-item-img{width:90px;height:90px;border-radius:12px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;font-size:48px;flex-shrink:0;overflow:hidden}
+  .shop-item-img img{width:100%;height:100%;object-fit:cover;display:block}
   .shop-item-info{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0}
   .shop-item-rank{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:var(--red);color:white;border-radius:6px;font-size:11px;font-weight:700;flex-shrink:0}
   .shop-item-rank.top3{background:var(--red)}
@@ -540,7 +541,6 @@ function tapMelon(e){
     state.cracked=true;
     state.pieces=Math.min(state.pieces+1,10);
     state.totalPieces++;
-    if(state.pieces>=10){state.totalPoints+=100;state.pieces=0}
     updateUI();
     document.getElementById('tapBtn').textContent='🎉 수박이 쪼개졌어요!';
     splitWatermelon(wrap);
@@ -732,41 +732,79 @@ function showToast(msg){
 initSlots();
 
 // ===== 수박 쇼핑 =====
-const melonProducts = [
-  { name: '컷팅 고당도 수박 500g, 1개', price: '14,900', original: '25,000', tags: ['로켓배송', '고당도'], delivery: '내일 새벽 도착', link: 'https://coupa.ng/cmorbH' },
-  { name: '당도선별 11brix 수박 6kg이상, 1개', price: '19,800', original: '32,000', tags: ['당도보장', '프리미엄'], delivery: '로켓프레시', link: 'https://coupa.ng/cmoswj' },
-  { name: '매일신선 당도보장 아삭한 꿀 하우스 수박 6kg, 1개', price: '11,900', original: '18,000', tags: ['산지직송', '꿀수박'], delivery: '내일 도착', link: 'https://coupa.ng/cmosyA' },
-  { name: '블랙망고 수박 6kg 1통', price: '16,500', original: '28,000', tags: ['인기', '고당도'], delivery: '로켓배송', link: 'https://link.coupang.com/DUMMY_LINK_4' },
-  { name: '고창 명품 수박 8kg 이상', price: '22,900', original: '35,000', tags: ['GAP인증', '대과'], delivery: '산지직송', link: 'https://link.coupang.com/DUMMY_LINK_5' },
-  { name: '미니 애플수박 1.5~2kg 2통', price: '13,900', original: '20,000', tags: ['미니', '1인가구'], delivery: '내일 새벽 도착', link: 'https://link.coupang.com/DUMMY_LINK_6' },
-  { name: '당도선별 씨없는 수박 5~6kg', price: '17,500', original: '27,000', tags: ['씨없는', '편의'], delivery: '로켓프레시', link: 'https://link.coupang.com/DUMMY_LINK_7' },
-  { name: '논산 꿀수박 특대 10kg 이상', price: '26,900', original: '40,000', tags: ['특대과', '파티용'], delivery: '산지직송', link: 'https://link.coupang.com/DUMMY_LINK_8' },
-  { name: '제주 흑수박 6~7kg 당도보장', price: '21,500', original: '33,000', tags: ['제주산', '당도보장'], delivery: '로켓배송', link: 'https://link.coupang.com/DUMMY_LINK_9' },
-  { name: '반쪽 컷팅 수박 2.5~3kg', price: '8,900', original: '14,000', tags: ['컷팅', '소용량'], delivery: '내일 새벽 도착', link: 'https://link.coupang.com/DUMMY_LINK_10' },
-  { name: '성주 참외농원 꿀수박 7kg', price: '18,900', original: '29,000', tags: ['농장직송', '고당도'], delivery: '산지직송', link: 'https://link.coupang.com/DUMMY_LINK_11' },
-  { name: '프리미엄 수박 선물세트 8kg', price: '29,900', original: '45,000', tags: ['선물용', '포장'], delivery: '로켓배송', link: 'https://link.coupang.com/DUMMY_LINK_12' },
+// 기본 상품(Firestore에 admin/products 없을 때 seed로 사용)
+let melonProducts = [
+  { id: 'p1',  name: '컷팅 고당도 수박 500g, 1개', thumb: '', price: '14,900', original: '25,000', tags: ['로켓배송', '고당도'], delivery: '내일 새벽 도착', link: 'https://coupa.ng/cmorbH' },
+  { id: 'p2',  name: '당도선별 11brix 수박 6kg이상, 1개', thumb: '', price: '19,800', original: '32,000', tags: ['당도보장', '프리미엄'], delivery: '로켓프레시', link: 'https://coupa.ng/cmoswj' },
+  { id: 'p3',  name: '매일신선 당도보장 아삭한 꿀 하우스 수박 6kg, 1개', thumb: '', price: '11,900', original: '18,000', tags: ['산지직송', '꿀수박'], delivery: '내일 도착', link: 'https://coupa.ng/cmosyA' },
+  { id: 'p4',  name: '블랙망고 수박 6kg 1통', thumb: '', price: '16,500', original: '28,000', tags: ['인기', '고당도'], delivery: '로켓배송', link: 'https://link.coupang.com/DUMMY_LINK_4' },
+  { id: 'p5',  name: '고창 명품 수박 8kg 이상', thumb: '', price: '22,900', original: '35,000', tags: ['GAP인증', '대과'], delivery: '산지직송', link: 'https://link.coupang.com/DUMMY_LINK_5' },
+  { id: 'p6',  name: '미니 애플수박 1.5~2kg 2통', thumb: '', price: '13,900', original: '20,000', tags: ['미니', '1인가구'], delivery: '내일 새벽 도착', link: 'https://link.coupang.com/DUMMY_LINK_6' },
+  { id: 'p7',  name: '당도선별 씨없는 수박 5~6kg', thumb: '', price: '17,500', original: '27,000', tags: ['씨없는', '편의'], delivery: '로켓프레시', link: 'https://link.coupang.com/DUMMY_LINK_7' },
+  { id: 'p8',  name: '논산 꿀수박 특대 10kg 이상', thumb: '', price: '26,900', original: '40,000', tags: ['특대과', '파티용'], delivery: '산지직송', link: 'https://link.coupang.com/DUMMY_LINK_8' },
+  { id: 'p9',  name: '제주 흑수박 6~7kg 당도보장', thumb: '', price: '21,500', original: '33,000', tags: ['제주산', '당도보장'], delivery: '로켓배송', link: 'https://link.coupang.com/DUMMY_LINK_9' },
+  { id: 'p10', name: '반쪽 컷팅 수박 2.5~3kg', thumb: '', price: '8,900', original: '14,000', tags: ['컷팅', '소용량'], delivery: '내일 새벽 도착', link: 'https://link.coupang.com/DUMMY_LINK_10' },
+  { id: 'p11', name: '성주 참외농원 꿀수박 7kg', thumb: '', price: '18,900', original: '29,000', tags: ['농장직송', '고당도'], delivery: '산지직송', link: 'https://link.coupang.com/DUMMY_LINK_11' },
+  { id: 'p12', name: '프리미엄 수박 선물세트 8kg', thumb: '', price: '29,900', original: '45,000', tags: ['선물용', '포장'], delivery: '로켓배송', link: 'https://link.coupang.com/DUMMY_LINK_12' },
 ];
+let productClicks = {}; // {id: count}
+
+function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
 function renderShopItems(){
   const list = document.getElementById('shopList');
-  list.innerHTML = melonProducts.map((p,i) => `
-    <a class="shop-item" href="${p.link}" target="_blank" rel="noopener">
-      <div class="shop-item-img">🍉</div>
+  if (!list) return;
+  // 클릭수 내림차순 정렬 (동점이면 원래 순서 유지)
+  const sorted = melonProducts
+    .map((p, i) => ({ p, i, c: productClicks[p.id] || 0 }))
+    .sort((a, b) => b.c - a.c || a.i - b.i)
+    .map(x => x.p);
+  list.innerHTML = sorted.map((p, i) => `
+    <a class="shop-item" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" onclick="trackProductClick('${escapeHtml(p.id)}')">
+      <div class="shop-item-img">${p.thumb ? `<img src="${escapeHtml(p.thumb)}" alt="" loading="lazy">` : '🍉'}</div>
       <div class="shop-item-info">
         <div style="display:flex;align-items:center;gap:6px">
           <span class="shop-item-rank ${i<3?'top3':'normal'}">${i+1}</span>
-          <span class="shop-item-name">${p.name}</span>
+          <span class="shop-item-name">${escapeHtml(p.name)}</span>
         </div>
-        <div class="shop-item-tags">${p.tags.map(t=>`<span class="shop-item-tag">${t}</span>`).join('')}</div>
+        <div class="shop-item-tags">${(p.tags||[]).map(t=>`<span class="shop-item-tag">${escapeHtml(t)}</span>`).join('')}</div>
         <div class="shop-item-price-row">
-          <span class="shop-item-price">${p.price}<small>원</small></span>
-          <span class="shop-item-original">${p.original}원</span>
+          <span class="shop-item-price">${escapeHtml(p.price)}<small>원</small></span>
+          <span class="shop-item-original">${escapeHtml(p.original)}원</span>
         </div>
-        <div class="shop-item-delivery">${p.delivery}</div>
+        <div class="shop-item-delivery">${escapeHtml(p.delivery)}</div>
       </div>
     </a>
   `).join('');
 }
+
+function trackProductClick(id){
+  if (!window.db) return;
+  try {
+    window.db.collection('admin').doc('productClicks')
+      .set({ counts: { [id]: firebase.firestore.FieldValue.increment(1) } }, { merge: true });
+    productClicks[id] = (productClicks[id] || 0) + 1;
+  } catch(e){ console.warn('click track fail', e); }
+}
+
+async function loadProductsAndClicks(){
+  if (!window.db) { renderShopItems(); return; }
+  try {
+    const [pDoc, cDoc] = await Promise.all([
+      window.db.collection('admin').doc('products').get(),
+      window.db.collection('admin').doc('productClicks').get(),
+    ]);
+    if (pDoc.exists && Array.isArray(pDoc.data().items) && pDoc.data().items.length) {
+      melonProducts = pDoc.data().items;
+    } else {
+      // seed 기본 상품 등록
+      await window.db.collection('admin').doc('products').set({ items: melonProducts });
+    }
+    productClicks = (cDoc.exists && cDoc.data().counts) || {};
+  } catch(e) { console.warn('load products fail', e); }
+  renderShopItems();
+}
+
 renderShopItems();
 
 function openMelonShop(){document.getElementById('shopOverlay').classList.add('active');document.body.style.overflow='hidden'}
@@ -961,6 +999,7 @@ initAds();
       });
       window.db = firebase.firestore();
       console.log('Firebase initialized');
+      loadProductsAndClicks();
       initTossLogin();
     };
     document.head.appendChild(s2);
