@@ -1018,13 +1018,26 @@ setTimeout(() => {
   if (document.body.classList.contains('loading')) hideSplash();
 }, 12000);
 
+// uid 관리: 토스 userKey > 저장된 fallback uid > 새로 생성 (1회)
+function _getStableGuestUid(){
+  let uid = localStorage.getItem('wm-uid');
+  if (!uid) {
+    uid = 'guest_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('wm-uid', uid);
+  }
+  return uid;
+}
+function _setUser(uid){
+  currentUser = { uid };
+  localStorage.setItem('wm-uid', uid); // 다음 진입 시 최후의 안전장치
+}
+
 function initTossLogin() {
-  // 토스앱 환경 = window.appLogin 존재
   if (typeof window.appLogin === 'function') {
     tossLogin();
   } else {
-    console.log('Not in Toss app, using test user');
-    currentUser = { uid: 'test_user_001' };
+    console.log('Not in Toss app, using stable local user');
+    _setUser(_getStableGuestUid());
     loadUserData();
     hideSplash();
   }
@@ -1040,59 +1053,88 @@ async function tossLogin() {
         body: JSON.stringify({ code: result.authorizationCode })
       });
       const data = await res.json();
-      if (data.success) {
-        currentUser = { uid: 'toss_' + data.userKey };
-        loadUserData();
+      if (data.success && data.userKey) {
+        _setUser('toss_' + data.userKey);
       } else {
-        currentUser = { uid: 'toss_guest_' + Date.now() };
-        loadUserData();
+        // 토큰 교환 실패 — 안정 uid 재사용
+        _setUser(_getStableGuestUid());
       }
     } else {
-      currentUser = { uid: 'toss_guest_' + Date.now() };
-      loadUserData();
+      // authorizationCode 못 받음 — 안정 uid 재사용
+      _setUser(_getStableGuestUid());
     }
   } catch (e) {
     console.error('Toss login error:', e);
-    currentUser = { uid: 'toss_guest_' + Date.now() };
-    loadUserData();
-  } finally {
-    hideSplash();
+    _setUser(_getStableGuestUid());
   }
+  loadUserData();
+  hideSplash();
 }
 
-// Firestore에서 유저 데이터 로드
+// 로컬 캐시 — Firestore 로드 전에라도 즉시 이전 값 복원 (새로고침 체감상 0에서 시작 방지)
+let _dataLoaded = false;
+(function restoreFromLocal(){
+  try {
+    const raw = localStorage.getItem('wm-state');
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (typeof d.pieces === 'number') state.pieces = d.pieces;
+      if (typeof d.totalPieces === 'number') state.totalPieces = d.totalPieces;
+      if (typeof d.totalPoints === 'number') state.totalPoints = d.totalPoints;
+    }
+  } catch(e) {}
+})();
+
+function _persistLocal(){
+  try {
+    localStorage.setItem('wm-state', JSON.stringify({
+      pieces: state.pieces,
+      totalPieces: state.totalPieces,
+      totalPoints: state.totalPoints,
+    }));
+  } catch(e) {}
+}
+
+// Firestore에서 유저 데이터 로드 (원격 = 진실 원본; 로컬보다 큰 값을 채택해 데이터 손실 방지)
 async function loadUserData() {
-  if (!currentUser || !window.db) return;
+  if (!currentUser || !window.db) { _dataLoaded = true; updateUI(); return; }
   try {
     const doc = await db.collection('users').doc(currentUser.uid).get();
     if (doc.exists) {
       const d = doc.data();
-      state.pieces = d.pieces || 0;
-      state.totalPieces = d.totalPieces || 0;
-      state.totalPoints = d.totalPoints || 0;
+      // 로컬 쪽이 더 큰 값을 가지면(마지막 save가 전송되지 못한 경우 등) 로컬 우선
+      state.pieces      = Math.max(state.pieces, d.pieces || 0);
+      state.totalPieces = Math.max(state.totalPieces, d.totalPieces || 0);
+      state.totalPoints = Math.max(state.totalPoints, d.totalPoints || 0);
     } else {
-      // 신규 유저
+      // 신규 유저 — 로컬 값이 있으면 그대로 초기화에 사용
       await db.collection('users').doc(currentUser.uid).set({
-        pieces: 0, totalPieces: 0, totalPoints: 0,
+        pieces: state.pieces || 0,
+        totalPieces: state.totalPieces || 0,
+        totalPoints: state.totalPoints || 0,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
-    updateUI();
   } catch (e) {
     console.error('Load user data error:', e);
   }
+  _dataLoaded = true;
+  _persistLocal();
+  updateUI();
 }
 
 // Firestore에 유저 데이터 저장
 async function saveUserData() {
+  _persistLocal(); // 즉시 로컬 저장 — 네트워크/인증 실패해도 다음 진입 때 복원
+  if (!_dataLoaded) return; // 원격 로드 전엔 저장 차단 (초기 0으로 덮어쓰기 방지)
   if (!currentUser || !window.db) return;
   try {
-    await db.collection('users').doc(currentUser.uid).update({
+    await db.collection('users').doc(currentUser.uid).set({
       pieces: state.pieces,
       totalPieces: state.totalPieces,
       totalPoints: state.totalPoints,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    }, { merge: true });
   } catch (e) {
     console.error('Save user data error:', e);
   }
