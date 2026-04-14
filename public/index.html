@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, maximum-scale=1, user-scalable=no">
+<script src="https://static.toss.im/apps-in-toss/web-framework/index.umd.js"></script>
+<script src="https://sdk-web.toss.im/toss-ads/v1/sdk.js"></script>
 <title>수박 깨기</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;600;700;900&display=swap');
@@ -317,8 +319,8 @@
   </div>
 
   <button class="exchange-btn" id="exchangeBtn" onclick="exchangePoints()">
-    <span>🍉 포인트로 교환하기</span>
-    <span class="exchange-sub" id="exchangeSub">10조각 모으면 교환 가능</span>
+    <span>🍉 포인트로 교환하기 (최대 100원)</span>
+    <span class="exchange-sub" id="exchangeSub">10조각 모으면 교환 가능 · 최대 100원</span>
   </button>
 
   <!-- 토스트 -->
@@ -601,20 +603,35 @@ function spawnParticles(parent,x,y,intensity){
 function openStory(){document.getElementById('storyOverlay').classList.add('active');document.body.style.overflow='hidden'}
 function closeStory(){document.getElementById('storyOverlay').classList.remove('active');document.body.style.overflow=''}
 
+function _todayKey(){
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+function _sharedToday(){
+  return localStorage.getItem('wm-share-date') === _todayKey();
+}
+function _markSharedToday(){
+  localStorage.setItem('wm-share-date', _todayKey());
+}
+
 function shareApp(){
-  // 실제 배포 시 Toss 공유 SDK 연동
-  if(navigator.share){
-    navigator.share({title:'수박 깨기',text:'수박 깨고 토스 포인트 받자! 🍉',url:window.location.href}).then(()=>{
-      state.pieces=Math.min(state.pieces+1,10);
-      state.totalPieces++;
-      updateUI();
-      showToast('🍉 공유 완료! 수박 조각 +1');
-    }).catch(()=>{});
-  } else {
+  if (_sharedToday()){
+    showToast('오늘은 이미 공유했어요! 내일 다시 해주세요 🙌');
+    return;
+  }
+  const grant = () => {
+    _markSharedToday();
     state.pieces=Math.min(state.pieces+1,10);
     state.totalPieces++;
     updateUI();
-    showToast('🍉 공유 완료! 수박 조각 +1');
+    saveUserData && saveUserData();
+    showToast('🍉 공유 완료! 수박 조각 +1 (하루 1회)');
+  };
+  if(navigator.share){
+    navigator.share({title:'수박 깨기',text:'수박 깨고 토스 포인트 받자! 🍉',url:window.location.href})
+      .then(grant).catch(()=>{});
+  } else {
+    grant();
   }
 }
 
@@ -677,10 +694,10 @@ function updateExchangeBtn(){
   const sub=document.getElementById('exchangeSub');
   if(state.pieces>=10){
     btn.classList.add('ready');
-    sub.textContent='지금 바로 교환할 수 있어요!';
+    sub.textContent='지금 바로 교환할 수 있어요! (최대 100원)';
   } else {
     btn.classList.remove('ready');
-    sub.textContent=`${10-state.pieces}조각 더 모으면 교환 가능`;
+    sub.textContent=`${10-state.pieces}조각 더 모으면 교환 가능 · 최대 100원`;
   }
 }
 
