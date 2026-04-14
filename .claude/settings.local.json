@@ -12,7 +12,8 @@
       "Bash(npm search:*)",
       "Bash(npm install:*)",
       "Bash(npm run:*)",
-      "Bash(npx ait:*)"
+      "Bash(npx ait:*)",
+      "Bash(npm i:*)"
     ]
   }
 }

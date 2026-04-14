@@ -11,12 +11,9 @@
   html,body{width:100%;height:100%;font-family:'Noto Sans KR',-apple-system,sans-serif;background:#F5F5F0;overflow-x:hidden;-webkit-tap-highlight-color:transparent;user-select:none}
 
   /* HEADER */
-  .header{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px;position:sticky;top:0;background:rgba(135,206,235,0.92);backdrop-filter:blur(12px);z-index:100}
-  .header-left{display:flex;align-items:center;gap:8px}
-  .header-back{font-size:20px;color:var(--text)}
-  .header-title{font-weight:700;font-size:17px;color:var(--text);display:flex;align-items:center;gap:6px}
-  .header-icon{width:24px;height:24px;border-radius:6px;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:14px}
-  .header-right{display:flex;align-items:center;gap:12px;color:#555;font-size:20px}
+  .header{display:flex;align-items:center;justify-content:center;padding:10px 16px;background:rgba(135,206,235,0.92);pointer-events:none}
+  .header-title{font-weight:700;font-size:15px;color:var(--text);display:flex;align-items:center;gap:6px}
+  .header-icon{width:22px;height:22px;border-radius:6px;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:13px}
 
   /* STATS BAR */
   .stats-bar{display:flex;margin:0;background:rgba(255,255,255,0.75);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.5)}
@@ -198,13 +195,9 @@
 </head>
 <body>
 
-<!-- HEADER -->
+<!-- TAB LABEL (non-interactive, sits below Toss nav) -->
 <div class="header">
-  <div class="header-left">
-    <div class="header-back">‹</div>
-    <div class="header-title"><div class="header-icon">🍉</div>수박 깨기</div>
-  </div>
-  <div class="header-right"><span>⋯</span><span>✕</span></div>
+  <div class="header-title"><div class="header-icon">🍉</div>수박 깨기</div>
 </div>
 
 <!-- STATS -->
@@ -332,7 +325,6 @@
   <div class="toast" id="toast"></div>
 
   <div class="ad-section" id="adBannerList" data-ad-slot="banner" style="min-height:96px"></div>
-  <div class="ad-section" id="adBannerNative" data-ad-slot="native" style="margin-top:10px;min-height:120px"></div>
 
   <!-- 진짜 수박 사러가기 배너 -->
   <div class="real-melon-banner" onclick="openMelonShop()">
@@ -742,97 +734,95 @@ let currentUser = null;
 
 // ===== TOSS ADS =====
 const BANNER_AD_ID = 'ait-ad-test-banner-id';
-const NATIVE_AD_ID = 'ait-ad-test-native-image-id';
 const INTERSTITIAL_AD_ID = 'ait-ad-test-interstitial-id';
 const REWARDED_AD_ID = 'ait-ad-test-rewarded-id';
 
-let _tossAdsReady = false;
-
 function initTossAds() {
-  if (typeof window.TossAds !== 'undefined' && window.TossAds.initialize) {
+  const banner = document.getElementById('adBannerList');
+  if (!banner) return;
+
+  if (typeof window.TossAds === 'undefined' || !window.TossAds.initialize) {
+    console.log('[TossAds] SDK 미로드 (웹 환경)');
+    banner.style.display = 'none';
+    return;
+  }
+
+  try {
     window.TossAds.initialize({
       callbacks: {
         onInitialized: () => {
-          _tossAdsReady = true;
-          console.log('[TossAds] 배너 초기화 완료');
-          document.querySelectorAll('[data-ad-slot]').forEach(el => {
-            const adId = el.dataset.adSlot === 'native' ? NATIVE_AD_ID : BANNER_AD_ID;
-            window.TossAds.attachBanner(adId, el, {
+          console.log('[TossAds] 초기화 완료, 배너 attach');
+          try {
+            window.TossAds.attachBanner(BANNER_AD_ID, banner, {
               theme: 'auto', tone: 'blackAndWhite', variant: 'expanded',
               callbacks: {
-                onNoFill: () => { el.style.display = 'none'; },
-                onAdFailedToRender: () => { el.style.display = 'none'; },
+                onNoFill: () => { console.log('[TossAds] noFill'); banner.style.display = 'none'; },
+                onAdFailedToRender: (e) => { console.warn('[TossAds] renderFail', e); banner.style.display = 'none'; },
               }
             });
-          });
+          } catch (e) { console.warn('[TossAds] attachBanner error', e); }
         },
-        onInitializationFailed: (e) => console.warn('[TossAds] 초기화 실패:', e),
+        onInitializationFailed: (e) => { console.warn('[TossAds] 초기화 실패', e); banner.style.display = 'none'; },
       }
     });
-  }
-
-  if (typeof window.loadFullScreenAd !== 'undefined') {
-    try {
-      window.loadFullScreenAd({
-        options: { adGroupId: INTERSTITIAL_AD_ID },
-        onEvent: (e) => { if (e.type === 'loaded') window._interstitialReady = true; },
-        onError: () => {}
-      });
-      window.loadFullScreenAd({
-        options: { adGroupId: REWARDED_AD_ID },
-        onEvent: (e) => { if (e.type === 'loaded') window._rewardedReady = true; },
-        onError: () => {}
-      });
-    } catch (e) {}
-  }
+  } catch (e) { console.warn('[TossAds] initialize error', e); banner.style.display = 'none'; }
 }
-setTimeout(initTossAds, 1000);
-setTimeout(() => {
-  if (!window._rewardedReady && typeof window.loadFullScreenAd !== 'undefined') {
-    try {
-      window.loadFullScreenAd({ options: { adGroupId: REWARDED_AD_ID }, onEvent: ev => { if (ev.type === 'loaded') window._rewardedReady = true; }, onError: () => {} });
-    } catch (e) {}
-  }
-}, 3000);
 
-function _fireFullScreen(adGroupId, readyKey, onRewarded, onDismiss) {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initTossAds);
+} else {
+  initTossAds();
+}
+
+function _showFullScreen(adGroupId, onRewarded, onDismiss) {
+  console.log('[Ad] show 시도', adGroupId);
   let rewarded = false;
-  window.showFullScreenAd({
-    options: { adGroupId },
-    onEvent: (e) => {
-      if (e.type === 'userEarnedReward') { rewarded = true; onRewarded && onRewarded(e.data); }
-      if (e.type === 'dismissed' || e.type === 'failedToShow') {
-        window[readyKey] = false;
-        try { window.loadFullScreenAd({ options: { adGroupId }, onEvent: ev => { if (ev.type === 'loaded') window[readyKey] = true; }, onError: () => {} }); } catch (e) {}
-        if (!rewarded) onDismiss && onDismiss();
-      }
-    },
-    onError: () => { onDismiss && onDismiss(); }
-  });
+  let dismissed = false;
+  const done = () => { if (!dismissed) { dismissed = true; onDismiss && onDismiss(); } };
+  try {
+    window.showFullScreenAd({
+      options: { adGroupId },
+      onEvent: (e) => {
+        console.log('[Ad] event', e.type, e);
+        if (e.type === 'userEarnedReward') { rewarded = true; onRewarded && onRewarded(e.data); }
+        if (e.type === 'dismissed' || e.type === 'failedToShow' || e.type === 'closed') {
+          if (!rewarded) done();
+        }
+      },
+      onError: (err) => { console.warn('[Ad] onError', err); done(); }
+    });
+  } catch (e) { console.warn('[Ad] show throw', e); done(); }
+}
+
+function _loadAndShow(adGroupId, onRewarded, onDismiss) {
+  if (typeof window.showFullScreenAd !== 'function' || typeof window.loadFullScreenAd !== 'function') {
+    console.warn('[Ad] SDK 없음');
+    onDismiss && onDismiss();
+    return;
+  }
+  console.log('[Ad] load 시도', adGroupId);
+  let shown = false;
+  const fire = () => { if (shown) return; shown = true; _showFullScreen(adGroupId, onRewarded, onDismiss); };
+  try {
+    window.loadFullScreenAd({
+      options: { adGroupId },
+      onEvent: (e) => {
+        console.log('[Ad:load] event', e.type, e);
+        if (e.type === 'loaded') fire();
+      },
+      onError: (err) => { console.warn('[Ad:load] onError', err); onDismiss && onDismiss(); }
+    });
+  } catch (e) { console.warn('[Ad:load] throw', e); onDismiss && onDismiss(); }
+  // fallback — 일부 버전은 load 이벤트 없이 바로 show 가능
+  setTimeout(fire, 2500);
 }
 
 function showInterstitialAd(onDismiss) {
-  if (typeof window.showFullScreenAd === 'undefined') { onDismiss && onDismiss(); return; }
-  if (window._interstitialReady) return _fireFullScreen(INTERSTITIAL_AD_ID, '_interstitialReady', null, onDismiss);
-  try {
-    window.loadFullScreenAd({
-      options: { adGroupId: INTERSTITIAL_AD_ID },
-      onEvent: (e) => { if (e.type === 'loaded') { window._interstitialReady = true; _fireFullScreen(INTERSTITIAL_AD_ID, '_interstitialReady', null, onDismiss); } },
-      onError: () => { onDismiss && onDismiss(); }
-    });
-  } catch (e) { onDismiss && onDismiss(); }
+  _loadAndShow(INTERSTITIAL_AD_ID, null, onDismiss);
 }
 
 function showRewardedAd(onRewarded, onDismiss) {
-  if (typeof window.showFullScreenAd === 'undefined') { onDismiss && onDismiss(); return; }
-  if (window._rewardedReady) return _fireFullScreen(REWARDED_AD_ID, '_rewardedReady', onRewarded, onDismiss);
-  try {
-    window.loadFullScreenAd({
-      options: { adGroupId: REWARDED_AD_ID },
-      onEvent: (e) => { if (e.type === 'loaded') { window._rewardedReady = true; _fireFullScreen(REWARDED_AD_ID, '_rewardedReady', onRewarded, onDismiss); } },
-      onError: () => { onDismiss && onDismiss(); }
-    });
-  } catch (e) { onDismiss && onDismiss(); }
+  _loadAndShow(REWARDED_AD_ID, onRewarded, onDismiss);
 }
 
 // Firebase SDK (CDN)
