@@ -7,7 +7,12 @@
       "Bash(vercel whoami:*)",
       "Bash(git ls-remote:*)",
       "Bash(vercel env:*)",
-      "Bash(firebase deploy:*)"
+      "Bash(firebase deploy:*)",
+      "Bash(npm view:*)",
+      "Bash(npm search:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npx ait:*)"
     ]
   }
 }

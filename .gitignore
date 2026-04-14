@@ -3,4 +3,7 @@ node_modules/
 *.log
 .env
 .env.local
+.env.production
 .vercel
+.granite
+dist/

@@ -331,16 +331,8 @@
   <!-- 토스트 -->
   <div class="toast" id="toast"></div>
 
-  <div class="ad-section" id="adBannerList">
-    <div class="ad-header">
-      <div class="ad-logo">AD</div>
-      <div style="flex:1"><div class="ad-name">광고 로딩 중</div><div class="ad-label">광고</div></div>
-    </div>
-    <div class="ad-image">Toss IAA 배너 영역</div>
-  </div>
-  <div class="ad-section" id="adBannerNative" style="margin-top:10px">
-    <div class="ad-image">Toss IAA 피드형 배너 영역</div>
-  </div>
+  <div class="ad-section" id="adBannerList" data-ad-slot="banner"></div>
+  <div class="ad-section" id="adBannerNative" data-ad-slot="native" style="margin-top:10px"></div>
 
   <!-- 진짜 수박 사러가기 배너 -->
   <div class="real-melon-banner" onclick="openMelonShop()">
@@ -573,23 +565,22 @@ function resetMelon(){
   document.getElementById('tapBtn').textContent='수박 눌러서 깨기!';
 }
 
-async function showAdPrompt(){
+function showAdPrompt(){
   const btn=document.getElementById('tapBtn');
   btn.disabled=true;
-  btn.textContent='📺 광고 불러오는 중...';
-  const result = await Ads.showRewarded();
-  btn.disabled=false;
-  if (result && result.error) {
-    btn.textContent='광고 로드 실패 — 다시 시도';
-    return;
-  }
-  if (result && result.rewarded === false) {
-    btn.textContent='광고 보고 이어서 깨기';
-    return;
-  }
-  state.needAd=false;
-  btn.textContent='✅ 이어서 깨주세요!';
-  document.getElementById('speech').textContent='좋아요! 이어서 깨요!';
+  btn.textContent='📺 광고 재생 중...';
+  showRewardedAd(
+    () => {
+      state.needAd=false;
+      btn.disabled=false;
+      btn.textContent='✅ 이어서 깨주세요!';
+      document.getElementById('speech').textContent='좋아요! 이어서 깨요!';
+    },
+    () => {
+      btn.disabled=false;
+      btn.textContent='광고 보고 이어서 깨기';
+    }
+  );
 }
 
 function spawnParticles(parent,x,y,intensity){
@@ -635,7 +626,7 @@ async function exchangePoints(){
     return;
   }
 
-  if (!window.TossAppBridge) {
+  if (typeof window.grantPromotionReward !== 'function') {
     state.pieces=0;
     state.totalPoints+=EXCHANGE_AMOUNT;
     updateUI();
@@ -647,7 +638,7 @@ async function exchangePoints(){
   const btn=document.getElementById('exchangeBtn');
   btn.disabled=true;
   try {
-    const result = await window.TossAppBridge.call('grantPromotionReward', {
+    const result = await window.grantPromotionReward({
       params: { promotionCode: TOSS_PROMOTION_CODE, amount: EXCHANGE_AMOUNT }
     });
 
@@ -670,7 +661,7 @@ async function exchangePoints(){
       updateUI();
       saveUserData();
       showToast('🎉 100원 교환 완료! 토스 포인트로 적립됐어요');
-      Ads.showInterstitial();
+      showInterstitialAd();
     }
   } catch (e) {
     console.error('exchangePoints error:', e);
@@ -750,33 +741,95 @@ const EXCHANGE_AMOUNT = 100;
 let currentUser = null;
 
 // ===== TOSS ADS =====
-const AD_IDS = {
-  interstitial: 'ait-ad-test-interstitial-id',
-  rewarded: 'ait-ad-test-rewarded-id',
-  bannerList: 'ait-ad-test-banner-id',
-  bannerNative: 'ait-ad-test-native-image-id'
-};
+const BANNER_AD_ID = 'ait-ad-test-banner-id';
+const NATIVE_AD_ID = 'ait-ad-test-native-image-id';
+const INTERSTITIAL_AD_ID = 'ait-ad-test-interstitial-id';
+const REWARDED_AD_ID = 'ait-ad-test-rewarded-id';
 
-const Ads = {
-  async showInterstitial() {
-    if (!window.TossAppBridge) return { skipped: true };
-    try {
-      return await window.TossAppBridge.call('showAdInterstitial', { adUnitId: AD_IDS.interstitial });
-    } catch (e) { console.warn('interstitial ad error', e); return { error: e }; }
-  },
-  async showRewarded() {
-    if (!window.TossAppBridge) return { rewarded: true, test: true };
-    try {
-      return await window.TossAppBridge.call('showAdRewarded', { adUnitId: AD_IDS.rewarded });
-    } catch (e) { console.warn('rewarded ad error', e); return { error: e }; }
-  },
-  async renderBanner(containerId, adUnitId, format) {
-    if (!window.TossAppBridge) return;
-    try {
-      await window.TossAppBridge.call('renderAdBanner', { containerId, adUnitId, format });
-    } catch (e) { console.warn('banner ad error', e); }
+let _tossAdsReady = false;
+
+function initTossAds() {
+  if (typeof window.TossAds !== 'undefined' && window.TossAds.initialize) {
+    window.TossAds.initialize({
+      callbacks: {
+        onInitialized: () => {
+          _tossAdsReady = true;
+          console.log('[TossAds] 배너 초기화 완료');
+          document.querySelectorAll('[data-ad-slot]').forEach(el => {
+            const adId = el.dataset.adSlot === 'native' ? NATIVE_AD_ID : BANNER_AD_ID;
+            window.TossAds.attachBanner(adId, el, {
+              theme: 'auto', tone: 'blackAndWhite', variant: 'expanded',
+              callbacks: {
+                onNoFill: () => { el.style.display = 'none'; },
+                onAdFailedToRender: () => { el.style.display = 'none'; },
+              }
+            });
+          });
+        },
+        onInitializationFailed: (e) => console.warn('[TossAds] 초기화 실패:', e),
+      }
+    });
   }
-};
+
+  if (typeof window.loadFullScreenAd !== 'undefined') {
+    try {
+      window.loadFullScreenAd({
+        options: { adGroupId: INTERSTITIAL_AD_ID },
+        onEvent: (e) => { if (e.type === 'loaded') window._interstitialReady = true; },
+        onError: () => {}
+      });
+      window.loadFullScreenAd({
+        options: { adGroupId: REWARDED_AD_ID },
+        onEvent: (e) => { if (e.type === 'loaded') window._rewardedReady = true; },
+        onError: () => {}
+      });
+    } catch (e) {}
+  }
+}
+setTimeout(initTossAds, 1000);
+setTimeout(() => {
+  if (!window._rewardedReady && typeof window.loadFullScreenAd !== 'undefined') {
+    try {
+      window.loadFullScreenAd({ options: { adGroupId: REWARDED_AD_ID }, onEvent: ev => { if (ev.type === 'loaded') window._rewardedReady = true; }, onError: () => {} });
+    } catch (e) {}
+  }
+}, 3000);
+
+function showInterstitialAd(onDismiss) {
+  if (typeof window.showFullScreenAd === 'undefined' || !window._interstitialReady) {
+    onDismiss && onDismiss(); return;
+  }
+  window.showFullScreenAd({
+    options: { adGroupId: INTERSTITIAL_AD_ID },
+    onEvent: (e) => {
+      if (e.type === 'dismissed' || e.type === 'failedToShow') {
+        window._interstitialReady = false;
+        try { window.loadFullScreenAd({ options: { adGroupId: INTERSTITIAL_AD_ID }, onEvent: ev => { if (ev.type === 'loaded') window._interstitialReady = true; }, onError: () => {} }); } catch (e) {}
+        onDismiss && onDismiss();
+      }
+    },
+    onError: () => { onDismiss && onDismiss(); }
+  });
+}
+
+function showRewardedAd(onRewarded, onDismiss) {
+  if (typeof window.showFullScreenAd === 'undefined' || !window._rewardedReady) {
+    onDismiss && onDismiss(); return;
+  }
+  let rewarded = false;
+  window.showFullScreenAd({
+    options: { adGroupId: REWARDED_AD_ID },
+    onEvent: (e) => {
+      if (e.type === 'userEarnedReward') { rewarded = true; onRewarded && onRewarded(e.data); }
+      if (e.type === 'dismissed' || e.type === 'failedToShow') {
+        window._rewardedReady = false;
+        try { window.loadFullScreenAd({ options: { adGroupId: REWARDED_AD_ID }, onEvent: ev => { if (ev.type === 'loaded') window._rewardedReady = true; }, onError: () => {} }); } catch (e) {}
+        if (!rewarded) onDismiss && onDismiss();
+      }
+    },
+    onError: () => { onDismiss && onDismiss(); }
+  });
+}
 
 // Firebase SDK (CDN)
 (function loadFirebase(){
@@ -806,15 +859,10 @@ const Ads = {
 
 // 토스 앱인토스 SDK 로드
 function initTossLogin() {
-  // 배너 광고 렌더
-  Ads.renderBanner('adBannerList', AD_IDS.bannerList, 'list');
-  Ads.renderBanner('adBannerNative', AD_IDS.bannerNative, 'native');
-
-  // 토스 미니앱 환경인지 확인
-  if (window.TossAppBridge) {
+  // 토스앱 환경 = window.appLogin 존재
+  if (typeof window.appLogin === 'function') {
     tossLogin();
   } else {
-    // 웹 테스트 환경 — 로컬 테스트용 더미 유저
     console.log('Not in Toss app, using test user');
     currentUser = { uid: 'test_user_001' };
     loadUserData();
@@ -823,8 +871,8 @@ function initTossLogin() {
 
 async function tossLogin() {
   try {
-    // 토스 앱인토스 appLogin
-    const result = await window.TossAppBridge.call('appLogin', {});
+    // 토스 앱인토스 appLogin (SDK window export)
+    const result = await window.appLogin({});
     if (result && result.authorizationCode) {
       // Vercel API로 토큰 교환
       const res = await fetch(VERCEL_API + '/api/toss-login', {
