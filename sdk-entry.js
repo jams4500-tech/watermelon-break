@@ -1,6 +1,7 @@
 // 앱인토스 SDK 진입점 - window에 모든 SDK 함수 노출
 import {
   TossAds,
+  GoogleAdMob,
   loadFullScreenAd,
   showFullScreenAd,
   appLogin,
@@ -9,6 +10,7 @@ import {
 
 // 광고
 window.TossAds = TossAds;
+window.GoogleAdMob = GoogleAdMob;
 window.loadFullScreenAd = loadFullScreenAd;
 window.showFullScreenAd = showFullScreenAd;
 

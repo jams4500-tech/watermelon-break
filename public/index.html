@@ -560,8 +560,8 @@ function resetMelon(){
 function showAdPrompt(){
   const btn=document.getElementById('tapBtn');
 
-  // SDK 자체가 없는 웹 환경
-  if (typeof window.showFullScreenAd !== 'function' || typeof window.loadFullScreenAd !== 'function') {
+  const loaders = _getLoaders();
+  if (loaders.length === 0) {
     state.needAd=false;
     btn.textContent='✅ 이어서 깨주세요!';
     document.getElementById('speech').textContent='(웹 테스트) 이어서 깨요!';
@@ -588,35 +588,48 @@ function showAdPrompt(){
     return;
   }
 
-  // 아직 로드 안 됐으면 지금 로드 → loaded 되는 즉시 재생
+  // 즉석 로드 → loaded 되면 재생, 각 API 순회
   console.log('[Ad] rewarded 즉석 로드 시도');
   let shown = false;
-  try {
-    window.loadFullScreenAd({
-      options: { adGroupId: REWARDED_AD_ID },
-      onEvent: (e) => {
-        console.log('[Ad:load] rewarded(inline)', e.type);
-        if (e.type === 'loaded' && !shown) {
-          shown = true;
-          _fsAd.rewarded.loaded = true;
-          _fsAd.rewarded.loading = false;
-          showRewardedAd(onReward, onDismiss);
-        }
-      },
-      onError: (err) => {
-        console.warn('[Ad:load] rewarded(inline) error', err && (err.message || err));
-        _fsAd.rewarded.loading = false;
-        showToast('광고를 불러오지 못했어요.');
+  let idx = 0;
+
+  const tryNext = () => {
+    if (shown || idx >= loaders.length) {
+      if (!shown) {
+        showToast('광고를 불러올 수 없어요.');
         onDismiss();
       }
-    });
-  } catch (e) {
-    console.warn('[Ad:load] rewarded(inline) throw', e && e.message);
-    showToast('광고를 불러올 수 없어요.');
-    onDismiss();
-  }
+      return;
+    }
+    const L = loaders[idx++];
+    console.log('[Ad:load:inline] try', L.name);
+    try {
+      const cleanup = L.load({
+        options: { adGroupId: REWARDED_AD_ID },
+        onEvent: (e) => {
+          console.log('[Ad:load:inline]', L.name, e.type);
+          if (e.type === 'loaded' && !shown) {
+            shown = true;
+            _fsAd.rewarded.loaded = true;
+            _fsAd.rewarded.loading = false;
+            _fsAd.rewarded.activeApi = L;
+            _fsAd.rewarded.cleanup = cleanup;
+            showRewardedAd(onReward, onDismiss);
+          }
+        },
+        onError: (err) => {
+          console.warn('[Ad:load:inline] error', L.name, err && (err.message || err));
+          try { cleanup && cleanup(); } catch (e) {}
+          tryNext();
+        }
+      });
+    } catch (e) {
+      console.warn('[Ad:load:inline] throw', L.name, e && e.message);
+      tryNext();
+    }
+  };
+  tryNext();
 
-  // 8초 이내 이벤트 없으면 포기
   setTimeout(() => {
     if (!shown) {
       console.warn('[Ad] rewarded 로드 타임아웃');
@@ -794,66 +807,107 @@ const _fsAd = {
   rewarded:     { loaded: false, loading: false, unregister: null },
 };
 
+// ver2(loadFullScreenAd) 우선, 실패 시 ver1(GoogleAdMob.loadAppsInTossAdMob) fallback
+function _getLoaders() {
+  const loaders = [];
+  if (typeof window.loadFullScreenAd === 'function') {
+    loaders.push({ name: 'ver2', load: window.loadFullScreenAd, show: window.showFullScreenAd });
+  }
+  if (window.GoogleAdMob && typeof window.GoogleAdMob.loadAppsInTossAdMob === 'function') {
+    loaders.push({
+      name: 'ver1',
+      load: window.GoogleAdMob.loadAppsInTossAdMob,
+      show: window.GoogleAdMob.showAppsInTossAdMob
+    });
+  }
+  return loaders;
+}
+
 function _preloadFullScreen(kind, adGroupId) {
-  if (typeof window.loadFullScreenAd !== 'function') return;
   const s = _fsAd[kind];
   if (s.loaded || s.loading) return;
   s.loading = true;
-  console.log('[Ad] preload', kind, adGroupId);
-  try {
-    s.unregister = window.loadFullScreenAd({
-      options: { adGroupId },
-      onEvent: (e) => {
-        console.log('[Ad:load]', kind, e.type);
-        if (e.type === 'loaded') { s.loaded = true; s.loading = false; }
-      },
-      onError: (err) => {
-        console.warn('[Ad:load] error', kind, err && (err.message || err));
-        s.loaded = false; s.loading = false;
-      }
-    });
-  } catch (e) {
-    console.warn('[Ad:load] throw', kind, e && e.message);
-    s.loaded = false; s.loading = false;
+  s.activeApi = null;
+
+  const loaders = _getLoaders();
+  if (loaders.length === 0) {
+    console.warn('[Ad] 사용 가능한 SDK 없음');
+    s.loading = false;
+    return;
   }
+
+  let idx = 0;
+  const tryNext = () => {
+    if (idx >= loaders.length) {
+      console.warn('[Ad] 모든 API 로드 실패', kind);
+      s.loading = false;
+      return;
+    }
+    const L = loaders[idx++];
+    console.log('[Ad] preload try', L.name, kind, adGroupId);
+    try {
+      const cleanup = L.load({
+        options: { adGroupId },
+        onEvent: (e) => {
+          console.log('[Ad:load]', L.name, kind, e.type);
+          if (e.type === 'loaded') {
+            s.loaded = true;
+            s.loading = false;
+            s.activeApi = L;
+            s.cleanup = cleanup;
+          }
+        },
+        onError: (err) => {
+          console.warn('[Ad:load] error', L.name, kind, err && (err.message || err));
+          try { cleanup && cleanup(); } catch (e) {}
+          if (!s.loaded) { tryNext(); }
+        }
+      });
+    } catch (e) {
+      console.warn('[Ad:load] throw', L.name, kind, e && e.message);
+      tryNext();
+    }
+  };
+  tryNext();
 }
 
 function _showFullScreen(kind, adGroupId, onRewarded, onDismiss) {
   const s = _fsAd[kind];
-  if (!s.loaded) {
+  if (!s.loaded || !s.activeApi) {
     console.warn('[Ad] show 불가 — 아직 로드 안됨', kind);
     onDismiss && onDismiss();
-    // 로드 재시도
     _preloadFullScreen(kind, adGroupId);
     return;
   }
-  console.log('[Ad] show', kind, adGroupId);
+  const api = s.activeApi;
+  console.log('[Ad] show', api.name, kind, adGroupId);
   let rewardedFired = false;
   try {
-    window.showFullScreenAd({
+    api.show({
       options: { adGroupId },
       onEvent: (e) => {
-        console.log('[Ad:show]', kind, e.type, e);
+        console.log('[Ad:show]', api.name, kind, e.type, e);
         if (e.type === 'userEarnedReward') {
           rewardedFired = true;
           onRewarded && onRewarded(e.data);
         }
         if (e.type === 'dismissed' || e.type === 'failedToShow') {
           s.loaded = false;
+          s.activeApi = null;
           if (!rewardedFired) onDismiss && onDismiss();
-          // 다음 광고 미리 로드
           setTimeout(() => _preloadFullScreen(kind, adGroupId), 300);
         }
       },
       onError: (err) => {
-        console.warn('[Ad:show] error', kind, err);
+        console.warn('[Ad:show] error', api.name, kind, err && (err.message || err));
         s.loaded = false;
+        s.activeApi = null;
         onDismiss && onDismiss();
         setTimeout(() => _preloadFullScreen(kind, adGroupId), 300);
       }
     });
   } catch (e) {
-    console.warn('[Ad:show] throw', kind, e);
+    console.warn('[Ad:show] throw', api.name, kind, e && e.message);
     onDismiss && onDismiss();
   }
 }
