@@ -15,7 +15,8 @@
       "Bash(npx ait:*)",
       "Bash(npm i:*)",
       "Bash(npm ls:*)",
-      "Bash(curl -sI https://watermelon-break.web.app/icon.svg)"
+      "Bash(curl -sI https://watermelon-break.web.app/icon.svg)",
+      "Bash(curl -s https://static.toss.im/apps-in-toss/web-framework/index.umd.js)"
     ]
   }
 }

@@ -326,6 +326,9 @@
   <!-- 토스트 -->
   <div class="toast" id="toast"></div>
 
+  <!-- 디버그 패널 (광고 문제 진단용) -->
+  <div id="adDebug" style="position:fixed;top:8px;right:8px;max-width:72%;background:rgba(0,0,0,0.85);color:#0f0;font:10px/1.35 monospace;padding:6px 8px;border-radius:6px;z-index:9999;max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-all"></div>
+
   <div class="toss-banner-ad" style="width:100%;min-height:96px;margin-top:14px;display:block" data-ad-unit-id="ait.v2.live.40f9eb3147c64b54"></div>
 
   <!-- 진짜 수박 사러가기 배너 -->
@@ -762,78 +765,122 @@ let currentUser = null;
 const INTERSTITIAL_AD_ID = 'ait.v2.live.ba1cf44a7f274c48';
 const REWARDED_AD_ID = 'ait.v2.live.5e0c49a774aa46d6';
 
+window.addEventListener('error', (ev) => { try { _dbg('WIN ERR: '+(ev.message||ev.error&&ev.error.message||'')); } catch(e){} });
+window.addEventListener('unhandledrejection', (ev) => { try { _dbg('UNHANDLED: '+(ev.reason&&ev.reason.message||ev.reason||'')); } catch(e){} });
+
+function _dbg(msg){
+  const el = document.getElementById('adDebug');
+  if (!el) return;
+  const line = new Date().toTimeString().slice(0,8) + ' ' + msg;
+  el.textContent = (el.textContent ? el.textContent + '\n' : '') + line;
+  console.log(msg);
+}
+
+function _snapshotGlobals(){
+  const g = (typeof window.TossAds !== 'undefined');
+  const l = (typeof window.loadFullScreenAd === 'function');
+  const s = (typeof window.showFullScreenAd === 'function');
+  const k = (typeof window.TossAdsSpaceKit !== 'undefined');
+  const aits = (typeof window.AppsInToss !== 'undefined');
+  const emitter = (typeof window.__GRANITE_NATIVE_EMITTER !== 'undefined');
+  const rnwv = (typeof window.ReactNativeWebView !== 'undefined');
+  _dbg(`globals TossAds=${g} load=${l} show=${s} SpaceKit=${k} AppsInToss=${aits} Emitter=${emitter} RNWebView=${rnwv}`);
+}
+
 function initAds() {
+  _snapshotGlobals();
   if (typeof TossAds === 'undefined' || !TossAds || !TossAds.initialize) {
-    console.warn('TossAds SDK 미로드');
+    _dbg('ERR: TossAds 미로드');
     return;
   }
-  TossAds.initialize({
-    callbacks: {
-      onInitialized: () => {
-        console.log('[TossAds] 초기화 완료');
-        document.querySelectorAll('[data-ad-unit-id]').forEach(el => {
-          const adGroupId = el.dataset.adUnitId;
-          try {
-            TossAds.attachBanner(adGroupId, el, { theme: 'auto' });
-            console.log('[Banner] attach', adGroupId);
-          } catch (e) {
-            console.error('[Banner] attach 실패', adGroupId, e);
-          }
-        });
+  _dbg('TossAds.initialize 호출');
+  try {
+    TossAds.initialize({
+      callbacks: {
+        onInitialized: () => {
+          _dbg('TossAds onInitialized OK');
+          document.querySelectorAll('[data-ad-unit-id]').forEach(el => {
+            const id = el.dataset.adUnitId;
+            try {
+              TossAds.attachBanner(id, el, {
+                theme: 'auto',
+                callbacks: {
+                  onAdRendered: () => _dbg('Banner rendered '+id.slice(-8)),
+                  onAdImpression: () => _dbg('Banner impression '+id.slice(-8)),
+                  onNoFill: () => _dbg('Banner noFill '+id.slice(-8)),
+                  onAdFailedToRender: (p) => _dbg('Banner fail '+id.slice(-8)+' '+(p&&p.error&&p.error.message||'')),
+                }
+              });
+              _dbg('Banner attach '+id.slice(-8));
+            } catch (e) {
+              _dbg('ERR Banner attach: '+(e&&e.message));
+            }
+          });
+        },
+        onInitializationFailed: (err) => _dbg('ERR TossAds init: '+(err&&err.message||err)),
       },
-      onInitializationFailed: (err) => console.error('[TossAds] 초기화 실패', err),
-    },
-  });
+    });
+  } catch (e) {
+    _dbg('THROW TossAds.initialize: '+(e&&e.message));
+  }
 }
 
 async function showInterstitialAd() {
   try {
-    if (typeof loadFullScreenAd !== 'function' || typeof showFullScreenAd !== 'function') return;
+    if (typeof loadFullScreenAd !== 'function' || typeof showFullScreenAd !== 'function') {
+      _dbg('ERR interstitial: SDK fn 없음');
+      return;
+    }
+    _dbg('interstitial load 시작');
     await new Promise((resolve, reject) => {
       loadFullScreenAd({
         options: { adGroupId: INTERSTITIAL_AD_ID },
-        onEvent: (e) => { if (e.type === 'loaded') resolve(); },
-        onError: reject,
+        onEvent: (e) => { _dbg('int:load '+e.type); if (e.type === 'loaded') resolve(); },
+        onError: (err)=>{ _dbg('int:load ERR '+(err&&err.message||err)); reject(err); },
       });
     });
+    _dbg('interstitial show 시작');
     await new Promise((resolve, reject) => {
       showFullScreenAd({
         options: { adGroupId: INTERSTITIAL_AD_ID },
-        onEvent: (e) => { if (e.type === 'dismissed') resolve(); },
-        onError: reject,
+        onEvent: (e) => { _dbg('int:show '+e.type); if (e.type === 'dismissed') resolve(); },
+        onError: (err)=>{ _dbg('int:show ERR '+(err&&err.message||err)); reject(err); },
       });
     });
-  } catch (e) { console.error('전면 광고 오류', e); }
+  } catch (e) { _dbg('THROW interstitial: '+(e&&e.message)); }
 }
 
 async function showRewardedAd(onRewarded, onDismiss) {
   try {
+    _snapshotGlobals();
     if (typeof loadFullScreenAd !== 'function' || typeof showFullScreenAd !== 'function') {
-      throw new Error('SDK 미로드');
+      throw new Error('SDK fn 없음');
     }
+    _dbg('rewarded load 시작 '+REWARDED_AD_ID.slice(-8));
     await new Promise((resolve, reject) => {
       loadFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
-        onEvent: (e) => { if (e.type === 'loaded') resolve(); },
-        onError: reject,
+        onEvent: (e) => { _dbg('rw:load '+e.type); if (e.type === 'loaded') resolve(); },
+        onError: (err)=>{ _dbg('rw:load ERR '+(err&&err.message||err)); reject(err); },
       });
     });
+    _dbg('rewarded show 시작');
     let rewarded = false;
     await new Promise((resolve, reject) => {
       showFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (e) => {
-          console.log('[Ad:show]', e.type);
+          _dbg('rw:show '+e.type);
           if (e.type === 'userEarnedReward') rewarded = true;
           if (e.type === 'dismissed' || e.type === 'userEarnedReward') resolve();
         },
-        onError: reject,
+        onError: (err)=>{ _dbg('rw:show ERR '+(err&&err.message||err)); reject(err); },
       });
     });
     if (rewarded) { onRewarded && onRewarded(); }
     else { onDismiss && onDismiss(); }
   } catch (e) {
-    console.error('리워드 광고 오류', e);
+    _dbg('THROW rewarded: '+(e&&e.message));
     onDismiss && onDismiss();
   }
 }
