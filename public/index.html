@@ -560,30 +560,70 @@ function resetMelon(){
 function showAdPrompt(){
   const btn=document.getElementById('tapBtn');
 
-  // 리워드 광고 미지원 환경(웹 테스트 등) — 그냥 진행
-  if (typeof window.showFullScreenAd !== 'function' ||
-      (window.showFullScreenAd.isSupported && !window.showFullScreenAd.isSupported())) {
+  // SDK 자체가 없는 웹 환경
+  if (typeof window.showFullScreenAd !== 'function' || typeof window.loadFullScreenAd !== 'function') {
     state.needAd=false;
     btn.textContent='✅ 이어서 깨주세요!';
-    document.getElementById('speech').textContent='(광고 미지원) 이어서 깨요!';
+    document.getElementById('speech').textContent='(웹 테스트) 이어서 깨요!';
     return;
   }
 
   btn.disabled=true;
   btn.textContent='📺 광고 재생 중...';
-  showRewardedAd(
-    () => {
-      state.needAd=false;
-      btn.disabled=false;
-      btn.textContent='✅ 이어서 깨주세요!';
-      document.getElementById('speech').textContent='좋아요! 이어서 깨요!';
-    },
-    () => {
-      btn.disabled=false;
-      btn.textContent='광고 보고 이어서 깨기';
-      showToast('광고 로드 중이에요. 잠시 후 다시 눌러주세요.');
+
+  const onReward = () => {
+    state.needAd=false;
+    btn.disabled=false;
+    btn.textContent='✅ 이어서 깨주세요!';
+    document.getElementById('speech').textContent='좋아요! 이어서 깨요!';
+  };
+  const onDismiss = () => {
+    btn.disabled=false;
+    btn.textContent='광고 보고 이어서 깨기';
+  };
+
+  // 프리로드된 리워드 광고가 있으면 바로 재생
+  if (_fsAd.rewarded.loaded) {
+    showRewardedAd(onReward, onDismiss);
+    return;
+  }
+
+  // 아직 로드 안 됐으면 지금 로드 → loaded 되는 즉시 재생
+  console.log('[Ad] rewarded 즉석 로드 시도');
+  let shown = false;
+  try {
+    window.loadFullScreenAd({
+      options: { adGroupId: REWARDED_AD_ID },
+      onEvent: (e) => {
+        console.log('[Ad:load] rewarded(inline)', e.type);
+        if (e.type === 'loaded' && !shown) {
+          shown = true;
+          _fsAd.rewarded.loaded = true;
+          _fsAd.rewarded.loading = false;
+          showRewardedAd(onReward, onDismiss);
+        }
+      },
+      onError: (err) => {
+        console.warn('[Ad:load] rewarded(inline) error', err && (err.message || err));
+        _fsAd.rewarded.loading = false;
+        showToast('광고를 불러오지 못했어요.');
+        onDismiss();
+      }
+    });
+  } catch (e) {
+    console.warn('[Ad:load] rewarded(inline) throw', e && e.message);
+    showToast('광고를 불러올 수 없어요.');
+    onDismiss();
+  }
+
+  // 8초 이내 이벤트 없으면 포기
+  setTimeout(() => {
+    if (!shown) {
+      console.warn('[Ad] rewarded 로드 타임아웃');
+      showToast('광고 로드 시간이 초과됐어요. 다시 시도해주세요.');
+      onDismiss();
     }
-  );
+  }, 8000);
 }
 
 function spawnParticles(parent,x,y,intensity){
@@ -756,10 +796,6 @@ const _fsAd = {
 
 function _preloadFullScreen(kind, adGroupId) {
   if (typeof window.loadFullScreenAd !== 'function') return;
-  if (!window.loadFullScreenAd.isSupported || !window.loadFullScreenAd.isSupported()) {
-    console.log('[Ad] loadFullScreenAd 미지원 (토스앱 5.227.0+ 필요)');
-    return;
-  }
   const s = _fsAd[kind];
   if (s.loaded || s.loading) return;
   s.loading = true;
@@ -772,12 +808,12 @@ function _preloadFullScreen(kind, adGroupId) {
         if (e.type === 'loaded') { s.loaded = true; s.loading = false; }
       },
       onError: (err) => {
-        console.warn('[Ad:load] error', kind, err);
+        console.warn('[Ad:load] error', kind, err && (err.message || err));
         s.loaded = false; s.loading = false;
       }
     });
   } catch (e) {
-    console.warn('[Ad:load] throw', kind, e);
+    console.warn('[Ad:load] throw', kind, e && e.message);
     s.loaded = false; s.loading = false;
   }
 }
@@ -840,11 +876,6 @@ function initTossAds() {
   if (!banner) return;
   if (typeof window.TossAds === 'undefined' || !window.TossAds.initialize) {
     console.log('[TossAds] SDK 없음 (웹 환경)');
-    banner.style.display = 'none';
-    return;
-  }
-  if (window.TossAds.initialize.isSupported && !window.TossAds.initialize.isSupported()) {
-    console.log('[TossAds] 배너 미지원 (토스앱 5.241.0+ 필요)');
     banner.style.display = 'none';
     return;
   }
