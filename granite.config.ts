@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: '수박 깨기',
     primaryColor: '#2e7d32',
-    icon: 'https://watermelon-break.web.app/icon.svg',
+    icon: 'https://watermelon-break.web.app/icon.png',
   },
   web: {
     host: 'localhost',

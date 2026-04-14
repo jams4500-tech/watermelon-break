@@ -8,7 +8,7 @@
     "deploy": "firebase deploy --only hosting"
   },
   "dependencies": {
-    "@apps-in-toss/web-framework": "^2.4.6"
+    "@apps-in-toss/web-framework": "2.1.0"
   },
   "devDependencies": {
     "vite": "^5.0.0"
