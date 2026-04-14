@@ -225,8 +225,8 @@
 <!-- STATS -->
 <div class="stats-bar">
   <div class="stat-cell">
-    <div class="stat-value" id="totalPoints">0<small>원</small></div>
-    <div class="stat-label">😍 받은 포인트</div>
+    <div class="stat-value" id="totalPoints">0<small>회</small></div>
+    <div class="stat-label">🎁 교환 횟수 (최대 100원/회)</div>
   </div>
   <div class="stat-cell">
     <div class="stat-value" id="totalPieces">0<small>개</small></div>
@@ -442,7 +442,7 @@
 </div>
 
 <script>
-const state = {taps:0, maxTaps:9, pieces:0, totalPieces:0, totalPoints:0, needAd:false, cracked:false};
+const state = {taps:0, maxTaps:9, pieces:0, totalPieces:0, totalPoints:0, redemptions:0, needAd:false, cracked:false};
 
 const cracks=[
   [{d:'M100 72 L102 90 L98 96',w:1.5,c:'#2E7D32',o:0.4}],
@@ -479,7 +479,7 @@ function initSlots(){
 }
 
 function updateUI(){
-  document.getElementById('totalPoints').innerHTML=state.totalPoints+'<small>원</small>';
+  document.getElementById('totalPoints').innerHTML=(state.redemptions||0)+'<small>회</small>';
   document.getElementById('totalPieces').innerHTML=state.totalPieces+'<small>개</small>';
   document.getElementById('pieceTxt').textContent=state.pieces+'개';
   document.getElementById('progressFill').style.width=(state.pieces/10*100)+'%';
@@ -666,10 +666,10 @@ async function exchangePoints(){
 
   if (typeof window.grantPromotionReward !== 'function') {
     state.pieces=0;
-    state.totalPoints+=EXCHANGE_AMOUNT;
+    state.redemptions=(state.redemptions||0)+1;
     updateUI();
     saveUserData();
-    showToast('🎉 (테스트) 100원 교환 완료');
+    showToast('🎉 (테스트) 교환 완료');
     return;
   }
 
@@ -695,10 +695,10 @@ async function exchangePoints(){
     }
     if ('key' in result) {
       state.pieces=0;
-      state.totalPoints+=EXCHANGE_AMOUNT;
+      state.redemptions=(state.redemptions||0)+1;
       updateUI();
       saveUserData();
-      showToast('🎉 100원 교환 완료! 토스 포인트로 적립됐어요');
+      showToast('🎉 랜덤 토스 포인트 지급 완료! (최대 100원) 토스 앱에서 확인해주세요');
       showInterstitialAd();
     }
   } catch (e) {
@@ -812,7 +812,7 @@ function closeShop(){document.getElementById('shopOverlay').classList.remove('ac
 
 // ===== TOSS LOGIN + FIREBASE =====
 const VERCEL_API = 'https://watermelon-break.vercel.app';
-const TOSS_PROMOTION_CODE = 'TEST_01KP2CEEBH4CJ9AEEP8NNMQ30W';
+const TOSS_PROMOTION_CODE = '01KP2CEEBH4CJ9AEEP8NNMQ30W';
 const EXCHANGE_AMOUNT = 100;
 let currentUser = null;
 
@@ -1081,6 +1081,7 @@ let _dataLoaded = false;
       if (typeof d.pieces === 'number') state.pieces = d.pieces;
       if (typeof d.totalPieces === 'number') state.totalPieces = d.totalPieces;
       if (typeof d.totalPoints === 'number') state.totalPoints = d.totalPoints;
+      if (typeof d.redemptions === 'number') state.redemptions = d.redemptions;
     }
   } catch(e) {}
 })();
@@ -1091,6 +1092,7 @@ function _persistLocal(){
       pieces: state.pieces,
       totalPieces: state.totalPieces,
       totalPoints: state.totalPoints,
+      redemptions: state.redemptions,
     }));
   } catch(e) {}
 }
@@ -1106,12 +1108,13 @@ async function loadUserData() {
       state.pieces      = Math.max(state.pieces, d.pieces || 0);
       state.totalPieces = Math.max(state.totalPieces, d.totalPieces || 0);
       state.totalPoints = Math.max(state.totalPoints, d.totalPoints || 0);
+      state.redemptions = Math.max(state.redemptions || 0, d.redemptions || 0);
     } else {
-      // 신규 유저 — 로컬 값이 있으면 그대로 초기화에 사용
       await db.collection('users').doc(currentUser.uid).set({
         pieces: state.pieces || 0,
         totalPieces: state.totalPieces || 0,
         totalPoints: state.totalPoints || 0,
+        redemptions: state.redemptions || 0,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
@@ -1133,6 +1136,7 @@ async function saveUserData() {
       pieces: state.pieces,
       totalPieces: state.totalPieces,
       totalPoints: state.totalPoints,
+      redemptions: state.redemptions || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch (e) {
