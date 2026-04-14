@@ -21,7 +21,7 @@ if (sdkScript) {
 }
 writeFileSync(OUT + '/index.html', html);
 
-['privacy.html', 'terms.html'].forEach(f => {
+['privacy.html', 'terms.html', 'icon.svg'].forEach(f => {
   const src = `${SRC}/${f}`;
   if (existsSync(src)) { copyFileSync(src, OUT + '/' + f); console.log(f + ' 복사'); }
 });

@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: '수박 깨기',
     primaryColor: '#2e7d32',
-    icon: 'https://static.toss.im/appsintoss/30705/1e023176-068e-42b8-811c-91bb763ab1fd.png',
+    icon: 'https://watermelon-break.web.app/icon.svg',
   },
   web: {
     host: 'localhost',
