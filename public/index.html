@@ -611,19 +611,57 @@ function shareApp(){
   }
 }
 
-function exchangePoints(){
+async function exchangePoints(){
   if(state.pieces<10){
     showToast(`🍉 수박 조각이 부족해요! (${state.pieces}/10)`);
-    // 교환 버튼 흔들기
     const btn=document.getElementById('exchangeBtn');
     btn.style.animation='none';btn.offsetHeight;
     btn.style.animation='shake 0.3s';
     return;
   }
-  state.pieces=0;
-  state.totalPoints+=100;
-  updateUI();
-  showToast('🎉 100원 교환 완료! 토스 포인트로 적립됐어요');
+
+  if (!window.TossAppBridge) {
+    state.pieces=0;
+    state.totalPoints+=EXCHANGE_AMOUNT;
+    updateUI();
+    saveUserData();
+    showToast('🎉 (테스트) 100원 교환 완료');
+    return;
+  }
+
+  const btn=document.getElementById('exchangeBtn');
+  btn.disabled=true;
+  try {
+    const result = await window.TossAppBridge.call('grantPromotionReward', {
+      params: { promotionCode: TOSS_PROMOTION_CODE, amount: EXCHANGE_AMOUNT }
+    });
+
+    if (!result) {
+      showToast('앱 버전이 낮아요. 토스 업데이트 후 다시 시도해주세요.');
+      return;
+    }
+    if (result === 'ERROR') {
+      showToast('포인트 지급 중 오류가 발생했어요.');
+      return;
+    }
+    if ('errorCode' in result) {
+      console.error('grantPromotionReward failed:', result);
+      showToast(`지급 실패 (${result.errorCode}): ${result.message || ''}`);
+      return;
+    }
+    if ('key' in result) {
+      state.pieces=0;
+      state.totalPoints+=EXCHANGE_AMOUNT;
+      updateUI();
+      saveUserData();
+      showToast('🎉 100원 교환 완료! 토스 포인트로 적립됐어요');
+    }
+  } catch (e) {
+    console.error('exchangePoints error:', e);
+    showToast('네트워크 오류가 발생했어요.');
+  } finally {
+    btn.disabled=false;
+  }
 }
 
 function updateExchangeBtn(){
@@ -691,6 +729,8 @@ function closeShop(){document.getElementById('shopOverlay').classList.remove('ac
 
 // ===== TOSS LOGIN + FIREBASE =====
 const VERCEL_API = 'https://watermelon-break.vercel.app';
+const TOSS_PROMOTION_CODE = 'TEST_01KP2CEEBH4CJ9AEEP8NNMQ30W';
+const EXCHANGE_AMOUNT = 100;
 let currentUser = null;
 
 // Firebase SDK (CDN)
