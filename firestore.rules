@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 유저 데이터: 클라이언트에서 자기 uid 것만 읽고 쓰게 하는 게 이상적이나,
+    // 현재 구조상 익명 uid 사용 중이라 전체 허용 (추후 Auth 연동 시 조정)
+    match /users/{uid} {
+      allow read, write: if true;
+    }
+    // 어드민 상품/클릭 카운트: 앱과 어드민 둘 다 접근 필요
+    match /admin/{doc} {
+      allow read, write: if true;
+    }
+  }
+}
