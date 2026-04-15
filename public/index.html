@@ -225,8 +225,8 @@
 <!-- STATS -->
 <div class="stats-bar">
   <div class="stat-cell">
-    <div class="stat-value" id="totalPoints">0<small>회</small></div>
-    <div class="stat-label">🎁 교환 횟수 (최대 100원/회)</div>
+    <div class="stat-value" id="totalPoints">0<small>원</small></div>
+    <div class="stat-label">😍 받은 포인트</div>
   </div>
   <div class="stat-cell">
     <div class="stat-value" id="totalPieces">0<small>개</small></div>
@@ -479,7 +479,7 @@ function initSlots(){
 }
 
 function updateUI(){
-  document.getElementById('totalPoints').innerHTML=(state.redemptions||0)+'<small>회</small>';
+  document.getElementById('totalPoints').innerHTML=(state.totalPoints||0)+'<small>원</small>';
   document.getElementById('totalPieces').innerHTML=state.totalPieces+'<small>개</small>';
   document.getElementById('pieceTxt').textContent=state.pieces+'개';
   document.getElementById('progressFill').style.width=(state.pieces/10*100)+'%';
@@ -664,12 +664,16 @@ async function exchangePoints(){
     return;
   }
 
+  // 1~100 사이 랜덤 지급액 (최대 EXCHANGE_AMOUNT)
+  const rewardAmount = Math.floor(Math.random() * EXCHANGE_AMOUNT) + 1;
+
   if (typeof window.grantPromotionReward !== 'function') {
     state.pieces=0;
     state.redemptions=(state.redemptions||0)+1;
+    state.totalPoints=(state.totalPoints||0)+rewardAmount;
     updateUI();
     saveUserData();
-    showToast('🎉 (테스트) 교환 완료');
+    showToast(`🎉 (테스트) ${rewardAmount}원 지급`);
     return;
   }
 
@@ -677,7 +681,7 @@ async function exchangePoints(){
   btn.disabled=true;
   try {
     const result = await window.grantPromotionReward({
-      params: { promotionCode: TOSS_PROMOTION_CODE, amount: EXCHANGE_AMOUNT }
+      params: { promotionCode: TOSS_PROMOTION_CODE, amount: rewardAmount }
     });
 
     if (!result) {
@@ -696,9 +700,10 @@ async function exchangePoints(){
     if ('key' in result) {
       state.pieces=0;
       state.redemptions=(state.redemptions||0)+1;
+      state.totalPoints=(state.totalPoints||0)+rewardAmount;
       updateUI();
       saveUserData();
-      showToast('🎉 랜덤 토스 포인트 지급 완료! (최대 100원) 토스 앱에서 확인해주세요');
+      showToast(`🎉 ${rewardAmount}원 당첨! 토스 포인트 지급 완료`);
       showInterstitialAd();
     }
   } catch (e) {
