@@ -254,7 +254,7 @@
   <div class="attend-head">
     <div>
       <div class="attend-title">🗓 7일 연속 출석 미션</div>
-      <div class="attend-sub" id="attendSub">매일 방문하고 7일째 수박 조각 5개 받기</div>
+      <div class="attend-sub" id="attendSub">7일 연속 방문하면 🍉 수박 조각 5개 지급! (하루라도 놓치면 1일차부터 다시)</div>
     </div>
   </div>
   <div class="attend-dots" id="attendDots"></div>
@@ -471,10 +471,27 @@
 <script>
 const state = {taps:0, maxTaps:9, pieces:0, totalPieces:0, totalPoints:0, redemptions:0, needAd:false, cracked:false,
   // 7일 출석
-  attendStreak: 0,       // 현재 연속 출석 일수 (0~7)
-  attendLastDate: '',    // 마지막으로 '출석'으로 카운트된 날짜 (YYYY-MM-DD)
-  attendClaimReady: false, // 7일 채워 보상 받을 수 있는 상태
+  attendStreak: 0,
+  attendLastDate: '',
+  attendClaimReady: false,
+  // 일일 교환 제한 (하루 최대 3회)
+  exchangesToday: 0,
+  exchangesDate: '',
 };
+const DAILY_EXCHANGE_LIMIT = 3;
+
+// 날짜가 바뀌었으면 카운터 리셋 (자정 지나면 자동 적용)
+function _rolloverDailyExchanges(){
+  const today = _todayStr();
+  if (state.exchangesDate !== today) {
+    state.exchangesDate = today;
+    state.exchangesToday = 0;
+  }
+}
+function _exchangesRemainingToday(){
+  _rolloverDailyExchanges();
+  return Math.max(0, DAILY_EXCHANGE_LIMIT - (state.exchangesToday || 0));
+}
 
 const cracks=[
   [{d:'M100 72 L102 90 L98 96',w:1.5,c:'#2E7D32',o:0.4}],
@@ -582,11 +599,13 @@ function renderAttendance(){
   } else if (visitedToday) {
     claimBtn.disabled = true;
     claimBtn.textContent = `오늘 출석 완료 (${streak}/7)`;
-    sub.textContent = `내일 방문하면 ${streak + 1}일째!`;
+    sub.textContent = streak < 7
+      ? `내일 방문하면 ${streak + 1}일째! 7일 연속 채우면 🍉 5개 지급`
+      : '7일 연속 방문하면 🍉 수박 조각 5개 지급!';
   } else {
     claimBtn.disabled = true;
     claimBtn.textContent = '앱 실행 중...';
-    sub.textContent = '매일 방문하고 7일째 수박 조각 5개 받기';
+    sub.textContent = '7일 연속 방문하면 🍉 수박 조각 5개 지급! (하루라도 놓치면 1일차부터 다시)';
   }
 }
 
@@ -603,6 +622,11 @@ function claimAttendance(){
 
 function tapMelon(e){
   if(state.cracked) return;
+  if (_exchangesRemainingToday() <= 0) {
+    document.getElementById('speech').textContent='오늘은 모든 수박을 다 깼어요! 자정 이후 다시 도전하세요 🌙';
+    showToast('🍉 오늘의 교환 3회를 모두 사용했어요. 내일 자정(00:00) 이후 다시 깰 수 있어요!');
+    return;
+  }
   if(state.needAd){showAdPrompt();return}
   state.taps++;
   const wrap=document.getElementById('melonWrap');
@@ -770,6 +794,10 @@ function shareApp(){
 }
 
 async function exchangePoints(){
+  if (_exchangesRemainingToday() <= 0) {
+    showToast('🌙 오늘의 교환 3회 모두 사용! 내일 자정(00:00) 이후 다시 가능해요');
+    return;
+  }
   if(state.pieces<10){
     showToast(`🍉 수박 조각이 부족해요! (${state.pieces}/10)`);
     const btn=document.getElementById('exchangeBtn');
@@ -785,9 +813,11 @@ async function exchangePoints(){
     state.pieces=0;
     state.redemptions=(state.redemptions||0)+1;
     state.totalPoints=(state.totalPoints||0)+rewardAmount;
+    _rolloverDailyExchanges();
+    state.exchangesToday=(state.exchangesToday||0)+1;
     updateUI();
     saveUserData();
-    showToast(`🎉 (테스트) ${rewardAmount}원 지급`);
+    showToast(`🎉 (테스트) ${rewardAmount}원 지급 (오늘 ${state.exchangesToday}/${DAILY_EXCHANGE_LIMIT})`);
     return;
   }
 
@@ -815,9 +845,16 @@ async function exchangePoints(){
       state.pieces=0;
       state.redemptions=(state.redemptions||0)+1;
       state.totalPoints=(state.totalPoints||0)+rewardAmount;
+      _rolloverDailyExchanges();
+      state.exchangesToday=(state.exchangesToday||0)+1;
       updateUI();
       saveUserData();
-      showToast(`🎉 ${rewardAmount}원 당첨! 토스 포인트 지급 완료`);
+      const remaining = DAILY_EXCHANGE_LIMIT - state.exchangesToday;
+      if (remaining > 0) {
+        showToast(`🎉 ${rewardAmount}원 당첨! 오늘 ${remaining}회 더 가능`);
+      } else {
+        showToast(`🎉 ${rewardAmount}원 당첨! 오늘의 교환을 모두 사용했어요`);
+      }
       showInterstitialAd();
     }
   } catch (e) {
@@ -831,12 +868,18 @@ async function exchangePoints(){
 function updateExchangeBtn(){
   const btn=document.getElementById('exchangeBtn');
   const sub=document.getElementById('exchangeSub');
+  const remaining = _exchangesRemainingToday();
+  if (remaining <= 0) {
+    btn.classList.remove('ready');
+    sub.textContent = '오늘은 모두 사용! 내일 자정 이후 다시 가능';
+    return;
+  }
   if(state.pieces>=10){
     btn.classList.add('ready');
-    sub.textContent='지금 바로 교환할 수 있어요! (최대 100원)';
+    sub.textContent=`지금 바로 교환 가능! 최대 100원 (오늘 ${remaining}회 남음)`;
   } else {
     btn.classList.remove('ready');
-    sub.textContent=`${10-state.pieces}조각 더 모으면 교환 가능 · 최대 100원`;
+    sub.textContent=`${10-state.pieces}조각 더 · 최대 100원 (오늘 ${remaining}회 남음)`;
   }
 }
 
@@ -1100,6 +1143,19 @@ async function showRewardedAd(onRewarded, onDismiss) {
 
 initAds();
 
+// 자정 넘어가면 일일 교환 카운터·출석 체크 자동 재갱신 (1분마다 체크)
+setInterval(() => {
+  const today = _todayStr();
+  if (state.exchangesDate && state.exchangesDate !== today) {
+    _rolloverDailyExchanges();
+    updateExchangeBtn();
+  }
+  if (state.attendLastDate && state.attendLastDate !== today) {
+    checkAttendance();
+    renderAttendance();
+  }
+}, 60000);
+
 // Firebase SDK (CDN)
 (function loadFirebase(){
   const s1 = document.createElement('script');
@@ -1205,6 +1261,8 @@ let _dataLoaded = false;
       if (typeof d.attendStreak === 'number') state.attendStreak = d.attendStreak;
       if (typeof d.attendLastDate === 'string') state.attendLastDate = d.attendLastDate;
       if (typeof d.attendClaimReady === 'boolean') state.attendClaimReady = d.attendClaimReady;
+      if (typeof d.exchangesToday === 'number') state.exchangesToday = d.exchangesToday;
+      if (typeof d.exchangesDate === 'string') state.exchangesDate = d.exchangesDate;
     }
   } catch(e) {}
 })();
@@ -1219,6 +1277,8 @@ function _persistLocal(){
       attendStreak: state.attendStreak,
       attendLastDate: state.attendLastDate,
       attendClaimReady: state.attendClaimReady,
+      exchangesToday: state.exchangesToday,
+      exchangesDate: state.exchangesDate,
     }));
   } catch(e) {}
 }
@@ -1241,6 +1301,13 @@ async function loadUserData() {
         state.attendLastDate = d.attendLastDate;
         state.attendClaimReady = !!d.attendClaimReady;
       }
+      // 교환 카운터: 원격 date가 더 크면(더 최근) 원격 채택, 같으면 로컬·원격 중 큰 값
+      if (d.exchangesDate && d.exchangesDate > (state.exchangesDate || '')) {
+        state.exchangesDate = d.exchangesDate;
+        state.exchangesToday = d.exchangesToday || 0;
+      } else if (d.exchangesDate === state.exchangesDate) {
+        state.exchangesToday = Math.max(state.exchangesToday || 0, d.exchangesToday || 0);
+      }
     } else {
       await db.collection('users').doc(currentUser.uid).set({
         pieces: state.pieces || 0,
@@ -1250,6 +1317,8 @@ async function loadUserData() {
         attendStreak: state.attendStreak || 0,
         attendLastDate: state.attendLastDate || '',
         attendClaimReady: !!state.attendClaimReady,
+        exchangesToday: state.exchangesToday || 0,
+        exchangesDate: state.exchangesDate || '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
@@ -1276,6 +1345,8 @@ async function saveUserData() {
       attendStreak: state.attendStreak || 0,
       attendLastDate: state.attendLastDate || '',
       attendClaimReady: !!state.attendClaimReady,
+      exchangesToday: state.exchangesToday || 0,
+      exchangesDate: state.exchangesDate || '',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch (e) {
