@@ -622,6 +622,10 @@ function claimAttendance(){
 
 function tapMelon(e){
   if(state.cracked) return;
+  if (typeof _dataLoaded !== 'undefined' && !_dataLoaded) {
+    showToast('잠시만요, 데이터 불러오는 중이에요...');
+    return;
+  }
   if (_exchangesRemainingToday() <= 0) {
     document.getElementById('speech').textContent='오늘은 모든 수박을 다 깼어요! 자정 이후 다시 도전하세요 🌙';
     showToast('🍉 오늘의 교환 3회를 모두 사용했어요. 내일 자정(00:00) 이후 다시 깰 수 있어요!');
@@ -794,6 +798,10 @@ function shareApp(){
 }
 
 async function exchangePoints(){
+  if (typeof _dataLoaded !== 'undefined' && !_dataLoaded) {
+    showToast('잠시만요, 데이터 불러오는 중이에요...');
+    return;
+  }
   if (_exchangesRemainingToday() <= 0) {
     showToast('🌙 오늘의 교환 3회 모두 사용! 내일 자정(00:00) 이후 다시 가능해요');
     return;
@@ -1214,8 +1222,7 @@ function initTossLogin() {
   } else {
     console.log('Not in Toss app, using stable local user');
     _setUser(_getStableGuestUid());
-    loadUserData();
-    hideSplash();
+    loadUserData().finally(hideSplash);
   }
 }
 
@@ -1243,7 +1250,8 @@ async function tossLogin() {
     console.error('Toss login error:', e);
     _setUser(_getStableGuestUid());
   }
-  loadUserData();
+  // 반드시 loadUserData() 완료된 뒤에 스플래시 제거 (경합 구간 제거)
+  try { await loadUserData(); } catch(e) {}
   hideSplash();
 }
 
