@@ -19,6 +19,21 @@
 
   /* STATS BAR */
   .stats-bar{display:flex;margin:0;background:rgba(255,255,255,0.75);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.5)}
+
+  /* 출석 미션 */
+  .attend-card{margin:10px 14px 0;background:white;border-radius:14px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .attend-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .attend-title{font-size:13px;font-weight:700;color:var(--text)}
+  .attend-sub{font-size:11px;color:var(--text-sub)}
+  .attend-dots{display:flex;justify-content:space-between;gap:4px}
+  .attend-day{flex:1;text-align:center}
+  .attend-circle{width:28px;height:28px;border-radius:50%;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;background:#F0F0F0;color:#BBB;border:1.5px solid #E8E8E8}
+  .attend-circle.done{background:linear-gradient(135deg,#FFB74D,#FF9800);color:white;border-color:#FF9800}
+  .attend-circle.reward{background:linear-gradient(135deg,#E8334A,#C62828);color:white;border-color:#C62828;font-size:14px}
+  .attend-circle.today{box-shadow:0 0 0 3px rgba(46,125,50,0.25);transform:scale(1.08)}
+  .attend-dlabel{font-size:10px;color:var(--text-sub)}
+  .attend-claim{margin-top:10px;width:100%;padding:10px;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer}
+  .attend-claim:disabled{background:#E0E0E0;color:#999;cursor:default}
   .stat-cell{flex:1;text-align:center;padding:14px 0;position:relative}
   .stat-cell:first-child::after{content:'';position:absolute;right:0;top:20%;height:60%;width:1px;background:rgba(0,0,0,0.08)}
   .stat-value{font-family:'Black Han Sans';font-size:26px;color:var(--text)}
@@ -234,6 +249,18 @@
   </div>
 </div>
 
+<!-- 7일 출석 미션 -->
+<div class="attend-card" id="attendCard">
+  <div class="attend-head">
+    <div>
+      <div class="attend-title">🗓 7일 연속 출석 미션</div>
+      <div class="attend-sub" id="attendSub">매일 방문하고 7일째 수박 조각 5개 받기</div>
+    </div>
+  </div>
+  <div class="attend-dots" id="attendDots"></div>
+  <button class="attend-claim" id="attendClaim" onclick="claimAttendance()" disabled>이어서 출석하기</button>
+</div>
+
 <!-- BEACH SCENE -->
 <div class="beach-scene">
   <div class="sun"></div>
@@ -442,7 +469,12 @@
 </div>
 
 <script>
-const state = {taps:0, maxTaps:9, pieces:0, totalPieces:0, totalPoints:0, redemptions:0, needAd:false, cracked:false};
+const state = {taps:0, maxTaps:9, pieces:0, totalPieces:0, totalPoints:0, redemptions:0, needAd:false, cracked:false,
+  // 7일 출석
+  attendStreak: 0,       // 현재 연속 출석 일수 (0~7)
+  attendLastDate: '',    // 마지막으로 '출석'으로 카운트된 날짜 (YYYY-MM-DD)
+  attendClaimReady: false, // 7일 채워 보상 받을 수 있는 상태
+};
 
 const cracks=[
   [{d:'M100 72 L102 90 L98 96',w:1.5,c:'#2E7D32',o:0.4}],
@@ -485,6 +517,88 @@ function updateUI(){
   document.getElementById('progressFill').style.width=(state.pieces/10*100)+'%';
   initSlots();
   updateExchangeBtn();
+  renderAttendance();
+}
+
+// ===== 7일 출석 미션 =====
+function _todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function _yesterdayStr(){
+  const d = new Date(); d.setDate(d.getDate()-1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// 앱 진입 시 1회 호출: 오늘 최초 방문이면 streak 업데이트
+function checkAttendance(){
+  const today = _todayStr();
+  const last = state.attendLastDate;
+  if (last === today) return; // 오늘 이미 체크됨
+  if (state.attendClaimReady) return; // 보상 미수령 상태면 streak 그대로 유지
+
+  if (last === _yesterdayStr()) {
+    state.attendStreak = Math.min((state.attendStreak || 0) + 1, 7);
+  } else {
+    // 연속 깨짐 또는 신규
+    state.attendStreak = 1;
+  }
+  state.attendLastDate = today;
+
+  if (state.attendStreak >= 7) {
+    state.attendClaimReady = true;
+    showToast('🎉 7일 연속 출석 달성! 보상을 받아주세요');
+  }
+  saveUserData();
+}
+
+function renderAttendance(){
+  const dots = document.getElementById('attendDots');
+  const claimBtn = document.getElementById('attendClaim');
+  const sub = document.getElementById('attendSub');
+  if (!dots || !claimBtn) return;
+
+  const streak = state.attendStreak || 0;
+  const today = _todayStr();
+  const visitedToday = state.attendLastDate === today;
+  dots.innerHTML = '';
+  for (let i = 1; i <= 7; i++) {
+    const el = document.createElement('div');
+    el.className = 'attend-day';
+    const isDone = i <= streak;
+    const isToday = i === streak && visitedToday;
+    const isReward = i === 7;
+    el.innerHTML = `
+      <div class="attend-circle ${isDone ? (isReward ? 'reward' : 'done') : ''} ${isToday ? 'today' : ''}">${isReward ? '🍉' : i}</div>
+      <div class="attend-dlabel">${isReward ? '보상' : i+'일'}</div>
+    `;
+    dots.appendChild(el);
+  }
+
+  if (state.attendClaimReady) {
+    claimBtn.disabled = false;
+    claimBtn.textContent = '🎁 수박 조각 5개 받기';
+    sub.textContent = '7일 연속 출석 성공! 보상을 받아주세요';
+  } else if (visitedToday) {
+    claimBtn.disabled = true;
+    claimBtn.textContent = `오늘 출석 완료 (${streak}/7)`;
+    sub.textContent = `내일 방문하면 ${streak + 1}일째!`;
+  } else {
+    claimBtn.disabled = true;
+    claimBtn.textContent = '앱 실행 중...';
+    sub.textContent = '매일 방문하고 7일째 수박 조각 5개 받기';
+  }
+}
+
+function claimAttendance(){
+  if (!state.attendClaimReady) return;
+  state.pieces = Math.min(state.pieces + 5, 10);
+  state.totalPieces += 5;
+  state.attendStreak = 0;
+  state.attendClaimReady = false;
+  updateUI();
+  saveUserData();
+  showToast('🍉 수박 조각 5개 획득! 7일 출석 보상');
 }
 
 function tapMelon(e){
@@ -735,6 +849,7 @@ function showToast(msg){
 
 // INIT
 initSlots();
+renderAttendance();
 
 // ===== 수박 쇼핑 =====
 // 기본 상품(Firestore에 admin/products 없을 때 seed로 사용)
@@ -1087,6 +1202,9 @@ let _dataLoaded = false;
       if (typeof d.totalPieces === 'number') state.totalPieces = d.totalPieces;
       if (typeof d.totalPoints === 'number') state.totalPoints = d.totalPoints;
       if (typeof d.redemptions === 'number') state.redemptions = d.redemptions;
+      if (typeof d.attendStreak === 'number') state.attendStreak = d.attendStreak;
+      if (typeof d.attendLastDate === 'string') state.attendLastDate = d.attendLastDate;
+      if (typeof d.attendClaimReady === 'boolean') state.attendClaimReady = d.attendClaimReady;
     }
   } catch(e) {}
 })();
@@ -1098,6 +1216,9 @@ function _persistLocal(){
       totalPieces: state.totalPieces,
       totalPoints: state.totalPoints,
       redemptions: state.redemptions,
+      attendStreak: state.attendStreak,
+      attendLastDate: state.attendLastDate,
+      attendClaimReady: state.attendClaimReady,
     }));
   } catch(e) {}
 }
@@ -1114,12 +1235,21 @@ async function loadUserData() {
       state.totalPieces = Math.max(state.totalPieces, d.totalPieces || 0);
       state.totalPoints = Math.max(state.totalPoints, d.totalPoints || 0);
       state.redemptions = Math.max(state.redemptions || 0, d.redemptions || 0);
+      // 출석: 원격이 더 최신(lastDate 큼)이면 원격 채택
+      if (d.attendLastDate && d.attendLastDate > (state.attendLastDate || '')) {
+        state.attendStreak = d.attendStreak || 0;
+        state.attendLastDate = d.attendLastDate;
+        state.attendClaimReady = !!d.attendClaimReady;
+      }
     } else {
       await db.collection('users').doc(currentUser.uid).set({
         pieces: state.pieces || 0,
         totalPieces: state.totalPieces || 0,
         totalPoints: state.totalPoints || 0,
         redemptions: state.redemptions || 0,
+        attendStreak: state.attendStreak || 0,
+        attendLastDate: state.attendLastDate || '',
+        attendClaimReady: !!state.attendClaimReady,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
@@ -1127,6 +1257,7 @@ async function loadUserData() {
     console.error('Load user data error:', e);
   }
   _dataLoaded = true;
+  checkAttendance();
   _persistLocal();
   updateUI();
 }
@@ -1142,6 +1273,9 @@ async function saveUserData() {
       totalPieces: state.totalPieces,
       totalPoints: state.totalPoints,
       redemptions: state.redemptions || 0,
+      attendStreak: state.attendStreak || 0,
+      attendLastDate: state.attendLastDate || '',
+      attendClaimReady: !!state.attendClaimReady,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch (e) {
