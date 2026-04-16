@@ -790,7 +790,7 @@ function shareApp(){
     showToast('🍉 공유 완료! 수박 조각 +1 (하루 1회)');
   };
   if(navigator.share){
-    navigator.share({title:'수박 깨기',text:'수박 깨고 토스 포인트 받자! 🍉',url:window.location.href})
+    navigator.share({title:'수박 깨기',text:'수박 깨고 토스 포인트 받자! 🍉',url:'https://minion.toss.im/3trTbqMh'})
       .then(grant).catch(()=>{});
   } else {
     grant();
